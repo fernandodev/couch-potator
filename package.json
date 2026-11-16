@@ -1,0 +1,45 @@
+{
+  "name": "couch-potator",
+  "version": "0.1.0",
+  "description": "A folder-backed spec board with a read-only browser viewer, dependency graph, and milestones.",
+  "keywords": [
+    "board",
+    "kanban",
+    "specs",
+    "trello",
+    "cli",
+    "agents"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "couch-potator": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup && node scripts/build-assets.mjs",
+    "dev": "npm run build && node dist/cli.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "npm run typecheck && npm run test && npm run build",
+    "pack:smoke": "npm pack --dry-run",
+    "prepublishOnly": "npm run check"
+  },
+  "dependencies": {
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "dompurify": "^3.2.6",
+    "marked": "^16.0.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><!--COUCH_POTATOR_TITLE--></title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230e3a63'/%3E%3Crect x='7' y='9' width='5' height='14' rx='2' fill='%237fb2e5'/%3E%3Crect x='14' y='9' width='5' height='9' rx='2' fill='%23ffffff'/%3E%3Crect x='21' y='9' width='5' height='6' rx='2' fill='%237fb2e5'/%3E%3C/svg%3E"
+    />
+    <!--COUCH_POTATOR_STYLE-->
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span class="brand-name">Board</span>
+      </div>
+
+      <div class="project-slot" id="projectSlot"></div>
+
+      <div class="spacer"></div>
+
+      <div class="segmented" id="viewToggle" role="tablist" aria-label="View">
+        <button type="button" role="tab" data-view="board">Cards</button>
+        <button type="button" role="tab" data-view="graph">Graph</button>
+      </div>
+
+      <button type="button" class="ghost-btn" id="briefBtn">Brief</button>
+      <button type="button" class="ghost-btn" id="reloadBtn" title="Regenerate with couch-potator view, then reload">Reload</button>
+      <span class="readonly-pill" id="readonlyPill" title="Read-only view">read only</span>
+    </header>
+
+    <main id="main" class="board-view"></main>
+    <div id="modalRoot"></div>
+
+    <!--COUCH_POTATOR_DATA-->
+    <!--COUCH_POTATOR_VENDOR-->
+    <!--COUCH_POTATOR_APP-->
+  </body>
+</html>

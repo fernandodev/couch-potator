@@ -21,11 +21,20 @@ diff, and `grep` all work on it.
 
 ## Install
 
+This is a local release: it is **not on the npm registry yet**. Install it from
+a checkout:
+
 ```sh
-npm install -g couch-potator
-# or run it without installing
-npx couch-potator --help
+npm install
+npm run build
+npm link            # exposes the `couch-potator` command on your PATH
 ```
+
+Then run `couch-potator init` inside the project you are building. To skip the
+global link, use `node /path/to/couch-potator/dist/cli.js <command>`.
+
+Once published, `npm install -g couch-potator` and `npx couch-potator` will work
+as usual.
 
 Node 20 or newer.
 
@@ -180,3 +189,10 @@ npm run check     # typecheck + tests + build
 The viewer assets live in `src/viewer/assets/`; `scripts/build-assets.mjs` copies
 them and the marked/DOMPurify bundles into `dist/assets/` so the published
 package has no runtime frontend dependency.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+Copyright (c) 2026 Fernando Martinez.
+

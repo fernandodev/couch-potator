@@ -180,11 +180,16 @@ DOMPurify, both inlined into the page.
 
 ```sh
 npm install
-npm run build     # bundle to dist/ and copy viewer assets
-npm test          # vitest
+npm run build     # esbuild bundle to dist/ and copy viewer assets
+npm test          # Node's test runner over tests/*.test.ts
 npm run typecheck
 npm run check     # typecheck + tests + build
 ```
+
+The bundle is one `esbuild` invocation (`scripts/build.mjs`). Tests are bundled
+with the same esbuild and executed by `node --test` (`scripts/test.mjs`), so the
+dev toolchain is esbuild plus TypeScript — no separate bundler or test framework
+to keep patched.
 
 The viewer assets live in `src/viewer/assets/`; `scripts/build-assets.mjs` copies
 them and the marked/DOMPurify bundles into `dist/assets/` so the published

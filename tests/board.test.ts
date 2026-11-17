@@ -1,9 +1,10 @@
+import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { cardsInColumn, findRoot, milestonesOf, resolveCard, scanBoard } from "./helpers.js";
+import { afterEach, beforeEach, describe, it } from "node:test";
 import { UsageError } from "../src/errors.js";
+import { cardsInColumn, findRoot, milestonesOf, resolveCard, scanBoard } from "./helpers.js";
 
 let root: string;
 
@@ -35,30 +36,30 @@ describe("scanBoard", () => {
     write("done", "z-card", "title: Z");
 
     const board = scanBoard(root);
-    expect(board.cards.map((card) => card.id)).toEqual(["a-card", "b-card", "z-card"]);
-    expect(cardsInColumn(board, "todo").map((card) => card.id)).toEqual(["a-card", "b-card"]);
+    assert.deepEqual(board.cards.map((card) => card.id), ["a-card", "b-card", "z-card"]);
+    assert.deepEqual(cardsInColumn(board, "todo").map((card) => card.id), ["a-card", "b-card"]);
   });
 
   it("derives status from the folder, not frontmatter", () => {
     write("blocked", "x", "title: X\nstatus: done\nblocked_reason: waiting");
     const board = scanBoard(root);
-    expect(board.byId.get("x")?.status).toBe("blocked");
+    assert.equal(board.byId.get("x")?.status, "blocked");
   });
 
   it("collects milestone registry from the brief and cards", () => {
     write("todo", "a", "title: A\nmilestone: 2");
     const board = scanBoard(root);
-    expect(milestonesOf(board)).toEqual([1, 2, 3]);
-    expect(board.brief.name).toBe("Demo");
-    expect(board.brief.currentMilestone).toBe(1);
+    assert.deepEqual(milestonesOf(board), [1, 2, 3]);
+    assert.equal(board.brief.name, "Demo");
+    assert.equal(board.brief.currentMilestone, 1);
   });
 
   it("warns about a stray folder but keeps parsing", () => {
     write("todo", "a", "title: A");
     mkdirSync(path.join(root, "board", "review"));
     const board = scanBoard(root, { lenient: true });
-    expect(board.issues.some((issue) => issue.message.includes("review"))).toBe(true);
-    expect(board.cards).toHaveLength(1);
+    assert.ok(board.issues.some((issue) => issue.message.includes("review")));
+    assert.equal(board.cards.length, 1);
   });
 
   it("throws on malformed frontmatter unless lenient", () => {
@@ -66,9 +67,9 @@ describe("scanBoard", () => {
       path.join(root, "board", "todo", "bad.md"),
       `---\ntitle: [unclosed\n---\n\nBody\n`,
     );
-    expect(() => scanBoard(root)).toThrow();
+    assert.throws(() => scanBoard(root));
     const board = scanBoard(root, { lenient: true });
-    expect(board.issues.some((issue) => issue.level === "error")).toBe(true);
+    assert.ok(board.issues.some((issue) => issue.level === "error"));
   });
 });
 
@@ -80,32 +81,32 @@ describe("resolveCard", () => {
 
   it("resolves exact ids, prefixes and substrings", () => {
     const board = scanBoard(root);
-    expect(resolveCard(board, "reduce-cold-start").id).toBe("reduce-cold-start");
-    expect(resolveCard(board, "reduce").id).toBe("reduce-cold-start");
-    expect(resolveCard(board, "checkbox").id).toBe("render-checkboxes");
+    assert.equal(resolveCard(board, "reduce-cold-start").id, "reduce-cold-start");
+    assert.equal(resolveCard(board, "reduce").id, "reduce-cold-start");
+    assert.equal(resolveCard(board, "checkbox").id, "render-checkboxes");
   });
 
   it("rejects ambiguous prefixes", () => {
     const board = scanBoard(root);
-    expect(() => resolveCard(board, "re")).toThrow(UsageError);
+    assert.throws(() => resolveCard(board, "re"), UsageError);
   });
 
   it("rejects unknown cards", () => {
     const board = scanBoard(root);
-    expect(() => resolveCard(board, "nope")).toThrow(/No card called/);
+    assert.throws(() => resolveCard(board, "nope"), /No card called/);
   });
 });
 
 describe("findRoot", () => {
   it("walks up from a nested directory", () => {
     mkdirSync(path.join(root, "board", "todo"), { recursive: true });
-    expect(findRoot(path.join(root, "board", "todo"))).toBe(root);
+    assert.equal(findRoot(path.join(root, "board", "todo")), root);
   });
 
   it("returns null when there is no board", () => {
     const empty = mkdtempSync(path.join(tmpdir(), "cpt-empty-"));
     try {
-      expect(findRoot(empty)).toBeNull();
+      assert.equal(findRoot(empty), null);
     } finally {
       rmSync(empty, { recursive: true, force: true });
     }

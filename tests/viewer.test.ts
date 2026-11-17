@@ -1,14 +1,20 @@
+import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, it } from "node:test";
 import { scanBoard } from "../src/board.js";
-import { buildPayload } from "../src/viewer/data.js";
 import { buildViewer } from "../src/viewer/build.js";
+import { buildPayload } from "../src/viewer/data.js";
 
 let root: string;
 
-const write = (column: string, id: string, frontmatter: string, body = "## Why\n\nBecause.\n"): void => {
+const write = (
+  column: string,
+  id: string,
+  frontmatter: string,
+  body = "## Why\n\nBecause.\n",
+): void => {
   const dir = path.join(root, "board", column);
   mkdirSync(dir, { recursive: true });
   writeFileSync(path.join(dir, `${id}.md`), `---\n${frontmatter}\n---\n\n${body}`);
@@ -36,32 +42,35 @@ describe("buildPayload", () => {
     const board = scanBoard(root);
     const payload = buildPayload(root, board);
 
-    expect(payload.projects).toHaveLength(1);
+    assert.equal(payload.projects.length, 1);
     const project = payload.projects[0]!;
-    expect(project.name).toBe("Viewer Demo");
-    expect(project.milestones).toEqual([1, 2]);
-    expect(project.current_milestone).toBe(2);
-    expect(project.brief).toContain("A brief.");
-    expect(project.brief_file).toBe("PROJECT.md");
-    expect(project.specs.map((spec) => spec.id)).toEqual(["base", "next", "stuck"]);
+    assert.equal(project.name, "Viewer Demo");
+    assert.deepEqual(project.milestones, [1, 2]);
+    assert.equal(project.current_milestone, 2);
+    assert.ok(project.brief.includes("A brief."));
+    assert.equal(project.brief_file, "PROJECT.md");
+    assert.deepEqual(
+      project.specs.map((spec) => spec.id),
+      ["base", "next", "stuck"],
+    );
 
     const next = project.specs.find((spec) => spec.id === "next")!;
-    expect(next.status).toBe("todo");
-    expect(next.depends_on).toEqual(["base"]);
-    expect(next.file).toBe("board/todo/next.md");
-    expect(next.body).toContain("Next body.");
+    assert.equal(next.status, "todo");
+    assert.deepEqual(next.depends_on, ["base"]);
+    assert.equal(next.file, "board/todo/next.md");
+    assert.ok(next.body.includes("Next body."));
   });
 
   it("falls back to the newest milestone when the brief has none", () => {
     writeFileSync(path.join(root, "PROJECT.md"), `---\nname: NoBrief\n---\n\n# NoBrief\n`);
     const payload = buildPayload(root, scanBoard(root));
-    expect(payload.projects[0]?.current_milestone).toBe(2);
+    assert.equal(payload.projects[0]?.current_milestone, 2);
   });
 
   it("honours a milestone override, including All", () => {
     const board = scanBoard(root);
-    expect(buildPayload(root, board, { milestone: 1 }).projects[0]?.current_milestone).toBe(1);
-    expect(buildPayload(root, board, { milestone: null }).projects[0]?.current_milestone).toBeNull();
+    assert.equal(buildPayload(root, board, { milestone: 1 }).projects[0]?.current_milestone, 1);
+    assert.equal(buildPayload(root, board, { milestone: null }).projects[0]?.current_milestone, null);
   });
 });
 
@@ -69,24 +78,26 @@ describe("buildViewer", () => {
   it("inlines data, styles, scripts and vendors", () => {
     const result = buildViewer(root, scanBoard(root));
 
-    expect(result.html).toContain('<script id="board-data" type="application/json">');
-    expect(result.html).toContain("<style>");
-    expect(result.html).toContain("marked");
-    expect(result.html).toContain("DOMPurify");
-    expect(result.html).not.toContain("COUCH_POTATOR");
-    expect(result.html).not.toMatch(/<script[^>]+src=/);
-    expect(result.html).not.toMatch(/<link[^>]+stylesheet/);
-    expect(result.cards).toBe(3);
-    expect(result.outPath.endsWith(path.join(".couch-potator", "viewer", "board.html"))).toBe(true);
+    assert.ok(result.html.includes('<script id="board-data" type="application/json">'));
+    assert.ok(result.html.includes("<style>"));
+    assert.ok(result.html.includes("marked"));
+    assert.ok(result.html.includes("DOMPurify"));
+    assert.ok(!result.html.includes("COUCH_POTATOR"));
+    assert.doesNotMatch(result.html, /<script[^>]+src=/);
+    assert.doesNotMatch(result.html, /<link[^>]+stylesheet/);
+    assert.equal(result.cards, 3);
+    assert.ok(result.outPath.endsWith(path.join(".couch-potator", "viewer", "board.html")));
   });
 
   it("embeds the spec bodies for the modal", () => {
     const result = buildViewer(root, scanBoard(root));
-    const match = result.html.match(/<script id="board-data" type="application\/json">([\s\S]*?)<\/script>/);
-    expect(match).not.toBeNull();
+    const match = result.html.match(
+      /<script id="board-data" type="application\/json">([\s\S]*?)<\/script>/,
+    );
+    assert.notEqual(match, null);
     const data = JSON.parse(match![1]!);
     const spec = data.projects[0].specs.find((item: { id: string }) => item.id === "next");
-    expect(spec.body).toContain("Next body.");
+    assert.ok(spec.body.includes("Next body."));
   });
 
   it("escapes a closing script tag inside spec bodies", () => {
@@ -94,8 +105,8 @@ describe("buildViewer", () => {
     const result = buildViewer(root, scanBoard(root));
     const scripts = result.html.match(/<script/g) ?? [];
     // one data block, one vendor bundle pair, one app bundle
-    expect(scripts.length).toBe(4);
-    expect(result.html).toContain("\\u003c/script>");
-    expect(result.html).not.toContain("</script> world");
+    assert.equal(scripts.length, 4);
+    assert.ok(result.html.includes("\\u003c/script>"));
+    assert.ok(!result.html.includes("</script> world"));
   });
 });

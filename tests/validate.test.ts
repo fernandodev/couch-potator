@@ -1,7 +1,8 @@
+import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, it } from "node:test";
 import { scanBoard } from "../src/board.js";
 import { findCycles, validateBoard } from "../src/validate.js";
 
@@ -34,8 +35,8 @@ describe("findCycles", () => {
     write("todo", "c", "title: C\ndepends_on: [b]");
     const board = scanBoard(root);
     const cycles = findCycles(board.cards);
-    expect(cycles).toHaveLength(1);
-    expect(cycles[0]).toHaveLength(4);
+    assert.equal(cycles.length, 1);
+    assert.equal(cycles[0]?.length, 4);
   });
 
   it("finds nothing on a diamond", () => {
@@ -44,7 +45,7 @@ describe("findCycles", () => {
     write("todo", "right", "title: Right\ndepends_on: [base]");
     write("todo", "top", "title: Top\ndepends_on: [left, right]");
     const board = scanBoard(root);
-    expect(findCycles(board.cards)).toEqual([]);
+    assert.deepEqual(findCycles(board.cards), []);
   });
 });
 
@@ -53,15 +54,18 @@ describe("validateBoard", () => {
     write("todo", "a", "title: A\nmilestone: 1");
     write("in-progress", "b", "title: B\ndepends_on: [a]");
     const issues = validateBoard(scanBoard(root));
-    expect(issues.filter((issue) => issue.level === "error")).toEqual([]);
+    assert.deepEqual(
+      issues.filter((issue) => issue.level === "error"),
+      [],
+    );
   });
 
   it("flags missing dependencies and self-dependencies", () => {
     write("todo", "a", "title: A\ndepends_on: [ghost, a]");
     const issues = validateBoard(scanBoard(root));
     const errors = issues.filter((issue) => issue.level === "error").map((issue) => issue.message);
-    expect(errors.some((message) => message.includes('depends_on "ghost"'))).toBe(true);
-    expect(errors.some((message) => message.includes("itself"))).toBe(true);
+    assert.ok(errors.some((message) => message.includes('depends_on "ghost"')));
+    assert.ok(errors.some((message) => message.includes("itself")));
   });
 
   it("flags duplicate ids across columns", () => {
@@ -70,7 +74,7 @@ describe("validateBoard", () => {
     const errors = validateBoard(scanBoard(root))
       .filter((issue) => issue.level === "error")
       .map((issue) => issue.message);
-    expect(errors.some((message) => message.includes('Duplicate card id "same"'))).toBe(true);
+    assert.ok(errors.some((message) => message.includes('Duplicate card id "same"')));
   });
 
   it("flags a frontmatter id that disagrees with the file name", () => {
@@ -78,7 +82,7 @@ describe("validateBoard", () => {
     const errors = validateBoard(scanBoard(root))
       .filter((issue) => issue.level === "error")
       .map((issue) => issue.message);
-    expect(errors.some((message) => message.includes("does not match the file name"))).toBe(true);
+    assert.ok(errors.some((message) => message.includes("does not match the file name")));
   });
 
   it("warns instead of failing on soft problems", () => {
@@ -87,9 +91,9 @@ describe("validateBoard", () => {
     const warnings = validateBoard(scanBoard(root))
       .filter((issue) => issue.level === "warning")
       .map((issue) => issue.message);
-    expect(warnings.some((message) => message.includes("Unknown kind"))).toBe(true);
-    expect(warnings.some((message) => message.includes("not a whole number"))).toBe(true);
-    expect(warnings.some((message) => message.includes("no blocked_reason"))).toBe(true);
+    assert.ok(warnings.some((message) => message.includes("Unknown kind")));
+    assert.ok(warnings.some((message) => message.includes("not a whole number")));
+    assert.ok(warnings.some((message) => message.includes("no blocked_reason")));
   });
 
   it("warns when current_milestone has no cards", () => {
@@ -101,6 +105,6 @@ describe("validateBoard", () => {
     const warnings = validateBoard(scanBoard(root))
       .filter((issue) => issue.level === "warning")
       .map((issue) => issue.message);
-    expect(warnings.some((message) => message.includes("current_milestone 9"))).toBe(true);
+    assert.ok(warnings.some((message) => message.includes("current_milestone 9")));
   });
 });

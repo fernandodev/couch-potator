@@ -1,7 +1,9 @@
+import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, it } from "node:test";
+import { scanBoard } from "../src/board.js";
 import { addCommand } from "../src/commands/add.js";
 import { checkCommand } from "../src/commands/check.js";
 import { initCommand } from "../src/commands/init.js";
@@ -12,55 +14,55 @@ import { rmCommand } from "../src/commands/rm.js";
 import { setCommand } from "../src/commands/set.js";
 import { showCommand } from "../src/commands/show.js";
 import { viewCommand } from "../src/commands/view.js";
-import { scanBoard } from "../src/board.js";
 import { parseMarkdown } from "../src/frontmatter.js";
+import { captureOutput, type OutputCapture } from "./support.js";
 
 let root: string;
+let output: OutputCapture;
 
 beforeEach(async () => {
   root = mkdtempSync(path.join(tmpdir(), "cpt-cmd-"));
-  vi.spyOn(console, "log").mockImplementation(() => {});
-  vi.spyOn(console, "error").mockImplementation(() => {});
-  vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+  output = captureOutput();
   await initCommand(["--root", root, "--name", "Demo"]);
 });
 
 afterEach(() => {
-  vi.restoreAllMocks();
+  output.restore();
   rmSync(root, { recursive: true, force: true });
 });
 
-const cardPath = (column: string, id: string): string => path.join(root, "board", column, `${id}.md`);
+const cardPath = (column: string, id: string): string =>
+  path.join(root, "board", column, `${id}.md`);
 
 describe("init", () => {
   it("creates the board, config, brief and agent files", () => {
-    expect(existsSync(path.join(root, "board", "todo"))).toBe(true);
-    expect(existsSync(path.join(root, "board", "in-progress"))).toBe(true);
-    expect(existsSync(path.join(root, "board", "blocked"))).toBe(true);
-    expect(existsSync(path.join(root, "board", "done"))).toBe(true);
-    expect(existsSync(path.join(root, ".couch-potator", "config.json"))).toBe(true);
-    expect(existsSync(path.join(root, "PROJECT.md"))).toBe(true);
-    expect(existsSync(path.join(root, "AGENTS.md"))).toBe(true);
-    expect(existsSync(path.join(root, ".opencode", "skills", "board", "SKILL.md"))).toBe(true);
-    expect(readFileSync(path.join(root, ".gitignore"), "utf8")).toContain(".couch-potator/viewer/");
+    assert.equal(existsSync(path.join(root, "board", "todo")), true);
+    assert.equal(existsSync(path.join(root, "board", "in-progress")), true);
+    assert.equal(existsSync(path.join(root, "board", "blocked")), true);
+    assert.equal(existsSync(path.join(root, "board", "done")), true);
+    assert.equal(existsSync(path.join(root, ".couch-potator", "config.json")), true);
+    assert.equal(existsSync(path.join(root, "PROJECT.md")), true);
+    assert.equal(existsSync(path.join(root, "AGENTS.md")), true);
+    assert.equal(existsSync(path.join(root, ".opencode", "skills", "board", "SKILL.md")), true);
+    assert.ok(readFileSync(path.join(root, ".gitignore"), "utf8").includes(".couch-potator/viewer/"));
 
     const brief = parseMarkdown(readFileSync(path.join(root, "PROJECT.md"), "utf8"));
-    expect(brief.data.name).toBe("Demo");
-    expect(brief.data.current_milestone).toBe(1);
+    assert.equal(brief.data.name, "Demo");
+    assert.equal(brief.data.current_milestone, 1);
   });
 
   it("is idempotent and keeps an existing brief", async () => {
     await initCommand(["--root", root, "--name", "Renamed"]);
     const brief = parseMarkdown(readFileSync(path.join(root, "PROJECT.md"), "utf8"));
-    expect(brief.data.name).toBe("Demo");
+    assert.equal(brief.data.name, "Demo");
   });
 
   it("can skip the agent scaffolding", async () => {
     const other = mkdtempSync(path.join(tmpdir(), "cpt-noskill-"));
     try {
       await initCommand(["--root", other, "--no-skill"]);
-      expect(existsSync(path.join(other, ".opencode"))).toBe(false);
-      expect(existsSync(path.join(other, "AGENTS.md"))).toBe(false);
+      assert.equal(existsSync(path.join(other, ".opencode")), false);
+      assert.equal(existsSync(path.join(other, "AGENTS.md")), false);
     } finally {
       rmSync(other, { recursive: true, force: true });
     }
@@ -69,37 +71,53 @@ describe("init", () => {
 
 describe("add", () => {
   it("writes a card with the full frontmatter", async () => {
-    await addCommand(["--root", root, "Reduce cold start", "-k", "feature", "-m", "2", "-p", "high"]);
+    await addCommand([
+      "--root",
+      root,
+      "Reduce cold start",
+      "-k",
+      "feature",
+      "-m",
+      "2",
+      "-p",
+      "high",
+    ]);
     const parsed = parseMarkdown(readFileSync(cardPath("todo", "reduce-cold-start"), "utf8"));
-    expect(parsed.data.title).toBe("Reduce cold start");
-    expect(parsed.data.kind).toBe("feature");
-    expect(parsed.data.milestone).toBe(2);
-    expect(parsed.data.priority).toBe("high");
-    expect(parsed.data.order).toBe(10);
-    expect(parsed.body).toContain("Done when");
+    assert.equal(parsed.data.title, "Reduce cold start");
+    assert.equal(parsed.data.kind, "feature");
+    assert.equal(parsed.data.milestone, 2);
+    assert.equal(parsed.data.priority, "high");
+    assert.equal(parsed.data.order, 10);
+    assert.ok(parsed.body.includes("Done when"));
   });
 
   it("deduplicates ids and appends to the column", async () => {
     await addCommand(["--root", root, "Same title"]);
     await addCommand(["--root", root, "Same title"]);
     const board = scanBoard(root);
-    expect(board.cards.map((card) => card.id).sort()).toEqual(["same-title", "same-title-2"]);
-    expect(board.cards.every((card) => card.order === 10 || card.order === 20)).toBe(true);
+    assert.deepEqual(
+      board.cards.map((card) => card.id).sort(),
+      ["same-title", "same-title-2"],
+    );
+    assert.equal(
+      board.cards.every((card) => card.order === 10 || card.order === 20),
+      true,
+    );
   });
 
   it("accepts column aliases", async () => {
     await addCommand(["--root", root, "Doing now", "-c", "wip"]);
-    expect(existsSync(cardPath("in-progress", "doing-now"))).toBe(true);
+    assert.equal(existsSync(cardPath("in-progress", "doing-now")), true);
   });
 
   it("rejects a missing title", async () => {
-    await expect(addCommand(["--root", root])).rejects.toThrow(/title/);
+    await assert.rejects(addCommand(["--root", root]), /title/);
   });
 
   it("warns but records forward dependencies", async () => {
     await addCommand(["--root", root, "Depends early", "-d", "not-yet"]);
     const board = scanBoard(root);
-    expect(board.byId.get("depends-early")?.dependsOn).toEqual(["not-yet"]);
+    assert.deepEqual(board.byId.get("depends-early")?.dependsOn, ["not-yet"]);
   });
 });
 
@@ -108,25 +126,16 @@ describe("list and show", () => {
     await addCommand(["--root", root, "One", "-m", "1"]);
     await addCommand(["--root", root, "Two", "-m", "2", "-c", "done"]);
 
-    const logs: string[] = [];
-    vi.mocked(console.log).mockImplementation((...args: unknown[]) => {
-      logs.push(args.join(" "));
-    });
-
+    output.clear();
     await listCommand(["--root", root, "-m", "2", "--ids"]);
-    expect(logs.join("\n")).toBe("two");
+    assert.equal(output.logs.join("\n").trim(), "two");
   });
 
   it("prints raw markdown with --raw", async () => {
     await addCommand(["--root", root, "Raw card"]);
-    const chunks: string[] = [];
-    vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array) => {
-      chunks.push(String(chunk));
-      return true;
-    });
-
+    output.clear();
     await showCommand(["--root", root, "raw-card", "--raw"]);
-    expect(chunks.join("")).toContain("title: Raw card");
+    assert.ok(output.logs.join("").includes("title: Raw card"));
   });
 });
 
@@ -137,13 +146,13 @@ describe("move", () => {
     await addCommand(["--root", root, "Third"]);
 
     await moveCommand(["--root", root, "second", "in-progress"]);
-    expect(existsSync(cardPath("todo", "second"))).toBe(false);
-    expect(existsSync(cardPath("in-progress", "second"))).toBe(true);
+    assert.equal(existsSync(cardPath("todo", "second")), false);
+    assert.equal(existsSync(cardPath("in-progress", "second")), true);
 
     const board = scanBoard(root);
-    expect(board.byId.get("first")?.order).toBe(10);
-    expect(board.byId.get("third")?.order).toBe(20);
-    expect(board.byId.get("second")?.status).toBe("in-progress");
+    assert.equal(board.byId.get("first")?.order, 10);
+    assert.equal(board.byId.get("third")?.order, 20);
+    assert.equal(board.byId.get("second")?.status, "in-progress");
   });
 
   it("supports --top, --before and --after", async () => {
@@ -156,12 +165,12 @@ describe("move", () => {
 
     const board = scanBoard(root);
     const todo = board.cards.filter((card) => card.status === "todo").map((card) => card.id);
-    expect(todo).toEqual(["gamma", "alpha", "beta"]);
+    assert.deepEqual(todo, ["gamma", "alpha", "beta"]);
   });
 
   it("rejects an unknown column", async () => {
     await addCommand(["--root", root, "Card"]);
-    await expect(moveCommand(["--root", root, "card", "review"])).rejects.toThrow(/Unknown column/);
+    await assert.rejects(moveCommand(["--root", root, "card", "review"]), /Unknown column/);
   });
 });
 
@@ -172,17 +181,17 @@ describe("set", () => {
     await setCommand(["--root", root, "card", "milestone", "3"]);
 
     let board = scanBoard(root);
-    expect(board.byId.get("card")?.blockedReason).toBe("waiting on review");
-    expect(board.byId.get("card")?.milestone).toBe(3);
+    assert.equal(board.byId.get("card")?.blockedReason, "waiting on review");
+    assert.equal(board.byId.get("card")?.milestone, 3);
 
     await setCommand(["--root", root, "card", "blocked_reason", "-"]);
     board = scanBoard(root);
-    expect(board.byId.get("card")?.blockedReason).toBeNull();
+    assert.equal(board.byId.get("card")?.blockedReason, null);
   });
 
   it("rejects unknown kinds", async () => {
     await addCommand(["--root", root, "Card"]);
-    await expect(setCommand(["--root", root, "card", "kind", "nope"])).rejects.toThrow(/Unknown kind/);
+    await assert.rejects(setCommand(["--root", root, "card", "kind", "nope"]), /Unknown kind/);
   });
 });
 
@@ -193,11 +202,11 @@ describe("links", () => {
     await linkCommand(["--root", root, "add", "top", "base"], "dep");
 
     let board = scanBoard(root);
-    expect(board.byId.get("top")?.dependsOn).toEqual(["base"]);
+    assert.deepEqual(board.byId.get("top")?.dependsOn, ["base"]);
 
     await linkCommand(["--root", root, "rm", "top", "base"], "dep");
     board = scanBoard(root);
-    expect(board.byId.get("top")?.dependsOn).toEqual([]);
+    assert.deepEqual(board.byId.get("top")?.dependsOn, []);
   });
 
   it("refuses to create a cycle and leaves the file untouched", async () => {
@@ -205,9 +214,9 @@ describe("links", () => {
     await addCommand(["--root", root, "B"]);
     await linkCommand(["--root", root, "add", "b", "a"], "dep");
 
-    await expect(linkCommand(["--root", root, "add", "a", "b"], "dep")).rejects.toThrow(/cycle/);
+    await assert.rejects(linkCommand(["--root", root, "add", "a", "b"], "dep"), /cycle/);
     const board = scanBoard(root);
-    expect(board.byId.get("a")?.dependsOn).toEqual([]);
+    assert.deepEqual(board.byId.get("a")?.dependsOn, []);
   });
 
   it("records related links without cycle checks", async () => {
@@ -217,8 +226,8 @@ describe("links", () => {
     await linkCommand(["--root", root, "add", "b", "a"], "rel");
 
     const board = scanBoard(root);
-    expect(board.byId.get("a")?.related).toEqual(["b"]);
-    expect(board.byId.get("b")?.related).toEqual(["a"]);
+    assert.deepEqual(board.byId.get("a")?.related, ["b"]);
+    assert.deepEqual(board.byId.get("b")?.related, ["a"]);
   });
 });
 
@@ -226,30 +235,30 @@ describe("rm", () => {
   it("deletes with --force", async () => {
     await addCommand(["--root", root, "Gone"]);
     await rmCommand(["--root", root, "gone", "--force"]);
-    expect(existsSync(cardPath("todo", "gone"))).toBe(false);
+    assert.equal(existsSync(cardPath("todo", "gone")), false);
   });
 
   it("refuses without confirmation when not a tty", async () => {
     await addCommand(["--root", root, "Gone"]);
-    await expect(rmCommand(["--root", root, "gone"])).rejects.toThrow(/without confirmation/);
+    await assert.rejects(rmCommand(["--root", root, "gone"]), /without confirmation/);
   });
 });
 
 describe("check", () => {
   it("exits 0 on a clean board", async () => {
     await addCommand(["--root", root, "Clean"]);
-    await expect(checkCommand(["--root", root])).resolves.toBe(0);
+    assert.equal(await checkCommand(["--root", root]), 0);
   });
 
   it("exits 1 on a dangling dependency", async () => {
     await addCommand(["--root", root, "Broken", "-d", "ghost"]);
-    await expect(checkCommand(["--root", root])).resolves.toBe(1);
+    assert.equal(await checkCommand(["--root", root]), 1);
   });
 
   it("exits 1 on warnings with --strict", async () => {
     await addCommand(["--root", root, "Category", "-k", "weird"]);
-    await expect(checkCommand(["--root", root])).resolves.toBe(0);
-    await expect(checkCommand(["--root", root, "--strict"])).resolves.toBe(1);
+    assert.equal(await checkCommand(["--root", root]), 0);
+    assert.equal(await checkCommand(["--root", root, "--strict"]), 1);
   });
 });
 
@@ -259,12 +268,12 @@ describe("view", () => {
     await viewCommand(["--root", root, "--no-open"]);
 
     const file = path.join(root, ".couch-potator", "viewer", "board.html");
-    expect(existsSync(file)).toBe(true);
+    assert.equal(existsSync(file), true);
     const html = readFileSync(file, "utf8");
-    expect(html).toContain('id="board-data"');
-    expect(html).toContain("Visible card");
-    expect(html).not.toContain("COUCH_POTATOR");
-    expect(html).not.toContain("/api/state");
-    expect(html).toContain("read only");
+    assert.ok(html.includes('id="board-data"'));
+    assert.ok(html.includes("Visible card"));
+    assert.ok(!html.includes("COUCH_POTATOR"));
+    assert.ok(!html.includes("/api/state"));
+    assert.ok(html.includes("read only"));
   });
 });

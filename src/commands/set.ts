@@ -1,7 +1,7 @@
 import { cyan, dim, green } from "../ansi.js";
 import { parseCommandArgs, text, ROOT_OPTION } from "../args.js";
 import { resolveCard, scanBoard } from "../board.js";
-import { today, writeCard } from "../card.js";
+import { normaliseSurfaces, today, writeCard } from "../card.js";
 import { isKind, KINDS } from "../columns.js";
 import { resolveRoot } from "../config.js";
 import { UsageError } from "../errors.js";
@@ -17,6 +17,8 @@ const FIELD_ALIASES: Record<string, string> = {
   priority: "priority",
   order: "order",
   title: "title",
+  surfaces: "surfaces",
+  surface: "surfaces",
   blocked_reason: "blocked_reason",
   blocked: "blocked_reason",
   reason: "blocked_reason",
@@ -39,7 +41,9 @@ export async function setCommand(argv: string[]): Promise<number> {
   const field = FIELD_ALIASES[rawField.trim().toLowerCase()];
   if (!field) {
     throw new UsageError(`Unknown field "${rawField}".`, {
-      details: ["kind, milestone, priority, order, title, blocked_reason, resolution, completed"],
+      details: [
+        "kind, milestone, priority, order, title, surfaces, blocked_reason, resolution, completed",
+      ],
     });
   }
 
@@ -78,6 +82,10 @@ export async function setCommand(argv: string[]): Promise<number> {
       if (clear) throw new UsageError("A card needs a title.");
       card.title = raw;
       shown = raw;
+      break;
+    case "surfaces":
+      card.surfaces = clear ? [] : normaliseSurfaces([raw]);
+      shown = card.surfaces.length ? card.surfaces.join(", ") : null;
       break;
     case "blocked_reason":
       card.blockedReason = clear ? null : raw;

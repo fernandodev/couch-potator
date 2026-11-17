@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import { bold, cyan, dim, red } from "./ansi.js";
 import { addCommand } from "./commands/add.js";
+import { bodyCommand } from "./commands/body.js";
 import { checkCommand } from "./commands/check.js";
 import { completeCommand, completionCommand } from "./commands/completion.js";
 import { editCommand } from "./commands/edit.js";
@@ -24,6 +25,7 @@ const COMMANDS: Record<string, Handler> = {
   list: listCommand,
   ls: listCommand,
   show: showCommand,
+  body: bodyCommand,
   move: moveCommand,
   mv: moveCommand,
   set: setCommand,
@@ -60,9 +62,10 @@ function help(): void {
   console.log(bold("Commands"));
   const rows: Array<[string, string]> = [
     ["init", "Create board/, PROJECT.md, config and agent scaffolding"],
-    ["add", "Create a card"],
+    ["add", "Create a card (-k kind, -m milestone, -p priority, -s surface)"],
     ["list", "List cards (-c column, -m milestone, --json, --ids)"],
     ["show", "Print a spec (--raw, --path, --json)"],
+    ["body", "Replace a spec body: body <card> --file <path|->"],
     ["move", "Move a card: move <card> <column> [--top|--bottom|--before|--after]"],
     ["set", "Set a field: set <card> <field> <value>"],
     ["dep", "Dependencies: dep add|rm <card> <card>, dep <card>"],
@@ -72,7 +75,7 @@ function help(): void {
     ["check", "Validate ids, links, cycles and columns"],
     ["graph", "Dependency graph: --format text|mermaid|dot"],
     ["view", "Build and open the read-only viewer (--watch, --no-open)"],
-    ["skill", "Install .opencode/skills/couch-potator-board/SKILL.md and the AGENTS.md block"],
+    ["skill", "Install the board and planner skills plus the AGENTS.md block"],
     ["completion", "Print or install shell completions (bash|zsh|fish)"],
   ];
   for (const [name, description] of rows) {

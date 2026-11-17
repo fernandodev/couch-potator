@@ -1,11 +1,12 @@
 {
   "name": "couch-potator",
   "version": "0.3.0",
-  "description": "A folder-backed spec board with a read-only browser viewer, dependency graph, and milestones.",
+  "description": "A folder-backed spec board with a planner skill, read-only browser viewer, dependency graph, and milestones.",
   "keywords": [
     "board",
     "kanban",
     "specs",
+    "planner",
     "trello",
     "cli",
     "agents"

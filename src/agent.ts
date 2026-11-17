@@ -6,11 +6,13 @@ import {
   AGENTS_END,
   AGENTS_START,
   agentsBlock,
+  plannerSkillTemplate,
   skillTemplate,
   type TemplateContext,
 } from "./templates.js";
 
 export const SKILL_NAME = "couch-potator-board";
+export const PLANNER_SKILL_NAME = "couch-potator-planner";
 
 const LEGACY_SKILL_NAME = "board";
 const LEGACY_SKILL_TITLE = "Board Viewer";
@@ -33,6 +35,10 @@ export function templateContext(root: string): TemplateContext {
 
 export function skillPath(root: string): string {
   return path.join(root, ".opencode", "skills", SKILL_NAME, "SKILL.md");
+}
+
+export function plannerSkillPath(root: string): string {
+  return path.join(root, ".opencode", "skills", PLANNER_SKILL_NAME, "SKILL.md");
 }
 
 // Earlier versions shipped `.opencode/skills/board/SKILL.md`. Remove it on
@@ -59,13 +65,19 @@ export function installAgentFiles(root: string, options: { force?: boolean } = {
   const skipped: string[] = [];
   const removed: string[] = [];
 
-  const skillFile = skillPath(root);
-  if (!existsSync(skillFile) || options.force) {
-    mkdirSync(path.dirname(skillFile), { recursive: true });
-    writeFileSync(skillFile, skillTemplate(context), "utf8");
-    written.push(relativeToRoot(root, skillFile));
-  } else {
-    skipped.push(relativeToRoot(root, skillFile));
+  const skills: Array<[string, string]> = [
+    [skillPath(root), skillTemplate(context)],
+    [plannerSkillPath(root), plannerSkillTemplate(context)],
+  ];
+
+  for (const [file, content] of skills) {
+    if (!existsSync(file) || options.force) {
+      mkdirSync(path.dirname(file), { recursive: true });
+      writeFileSync(file, content, "utf8");
+      written.push(relativeToRoot(root, file));
+    } else {
+      skipped.push(relativeToRoot(root, file));
+    }
   }
 
   removeLegacySkill(root, removed);

@@ -5,6 +5,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import { scanBoard } from "../src/board.js";
 import { addCommand } from "../src/commands/add.js";
+import { bodyCommand } from "../src/commands/body.js";
 import { checkCommand } from "../src/commands/check.js";
 import { initCommand } from "../src/commands/init.js";
 import { linkCommand } from "../src/commands/link.js";
@@ -47,19 +48,41 @@ describe("init", () => {
       existsSync(path.join(root, ".opencode", "skills", "couch-potator-board", "SKILL.md")),
       true,
     );
+    assert.equal(
+      existsSync(path.join(root, ".opencode", "skills", "couch-potator-planner", "SKILL.md")),
+      true,
+    );
     assert.ok(readFileSync(path.join(root, ".gitignore"), "utf8").includes(".couch-potator/viewer/"));
 
     const brief = parseMarkdown(readFileSync(path.join(root, "PROJECT.md"), "utf8"));
     assert.equal(brief.data.name, "Demo");
     assert.equal(brief.data.current_milestone, 1);
+    assert.ok(brief.body.includes("## Vision"));
+    assert.ok(brief.body.includes("## Working state"));
+    assert.ok(brief.body.includes("## Ideas / later"));
   });
 
-  it("names the skill after the tool and matches its folder", () => {
-    const skill = parseMarkdown(
-      readFileSync(path.join(root, ".opencode", "skills", "couch-potator-board", "SKILL.md"), "utf8"),
+  it("names the skills after the tool and their folders", () => {
+    for (const name of ["couch-potator-board", "couch-potator-planner"]) {
+      const skill = parseMarkdown(
+        readFileSync(path.join(root, ".opencode", "skills", name, "SKILL.md"), "utf8"),
+      );
+      assert.equal(skill.data.name, name);
+      assert.match(String(skill.data.description), /couch-potator/);
+    }
+  });
+
+  it("makes the planner the planning law and points at the question tool", () => {
+    const planner = readFileSync(
+      path.join(root, ".opencode", "skills", "couch-potator-planner", "SKILL.md"),
+      "utf8",
     );
-    assert.equal(skill.data.name, "couch-potator-board");
-    assert.match(String(skill.data.description), /couch-potator/);
+    assert.match(planner, /You are the \*\*planner\*\*/);
+    assert.match(planner, /question/);
+    assert.match(planner, /Is this milestone enough/);
+    assert.match(planner, /couch-potator add/);
+    assert.match(planner, /couch-potator body/);
+    assert.match(planner, /couch-potator check/);
   });
 
   it("removes the legacy board skill", async () => {
@@ -113,7 +136,38 @@ describe("add", () => {
     assert.equal(parsed.data.milestone, 2);
     assert.equal(parsed.data.priority, "high");
     assert.equal(parsed.data.order, 10);
-    assert.ok(parsed.body.includes("Done when"));
+    assert.ok(parsed.body.includes("## User story"));
+    assert.ok(parsed.body.includes("## Acceptance criteria"));
+    assert.ok(parsed.body.includes("## Out of scope"));
+  });
+
+  it("records surfaces, splitting comma-separated values", async () => {
+    await addCommand([
+      "--root",
+      root,
+      "Change the board",
+      "-s",
+      "board-screen",
+      "-s",
+      "card-panel,search",
+    ]);
+    const board = scanBoard(root);
+    assert.deepEqual(board.byId.get("change-the-board")?.surfaces, [
+      "board-screen",
+      "card-panel",
+      "search",
+    ]);
+  });
+
+  it("uses the project card template for new bodies", async () => {
+    writeFileSync(
+      path.join(root, ".couch-potator", "templates", "card.md"),
+      "## Custom\n\nA custom body.\n",
+      "utf8",
+    );
+    await addCommand(["--root", root, "Templated"]);
+    const parsed = parseMarkdown(readFileSync(cardPath("todo", "templated"), "utf8"));
+    assert.ok(parsed.body.includes("A custom body."));
   });
 
   it("deduplicates ids and appends to the column", async () => {
@@ -161,6 +215,39 @@ describe("list and show", () => {
     output.clear();
     await showCommand(["--root", root, "raw-card", "--raw"]);
     assert.ok(output.logs.join("").includes("title: Raw card"));
+  });
+
+  it("exposes surfaces in JSON and in the plain spec", async () => {
+    await addCommand(["--root", root, "Visible change", "-s", "board-screen,card-panel"]);
+
+    output.clear();
+    await showCommand(["--root", root, "visible-change", "--json"]);
+    const json = JSON.parse(output.logs.join(""));
+    assert.deepEqual(json.surfaces, ["board-screen", "card-panel"]);
+
+    output.clear();
+    await showCommand(["--root", root, "visible-change"]);
+    assert.match(output.logs.join(""), /surfaces\s+board-screen, card-panel/);
+  });
+});
+
+describe("body", () => {
+  it("replaces a card body and keeps the frontmatter", async () => {
+    await addCommand(["--root", root, "Replace me", "-k", "feature", "-m", "2"]);
+    const file = path.join(root, "body.md");
+    writeFileSync(file, "## Summary\n\nA new body.\n", "utf8");
+
+    await bodyCommand(["--root", root, "replace-me", "--file", file]);
+
+    const parsed = parseMarkdown(readFileSync(cardPath("todo", "replace-me"), "utf8"));
+    assert.equal(parsed.data.title, "Replace me");
+    assert.equal(parsed.data.milestone, 2);
+    assert.ok(parsed.body.includes("A new body."));
+    assert.ok(!parsed.body.includes("Acceptance criteria"));
+  });
+
+  it("requires a card and a file", async () => {
+    await assert.rejects(bodyCommand(["--root", root, "missing"]), /needs a card and a file/);
   });
 });
 
@@ -212,6 +299,18 @@ describe("set", () => {
     await setCommand(["--root", root, "card", "blocked_reason", "-"]);
     board = scanBoard(root);
     assert.equal(board.byId.get("card")?.blockedReason, null);
+  });
+
+  it("sets and clears surfaces", async () => {
+    await addCommand(["--root", root, "Card"]);
+    await setCommand(["--root", root, "card", "surfaces", "board-screen, card-panel"]);
+
+    let board = scanBoard(root);
+    assert.deepEqual(board.byId.get("card")?.surfaces, ["board-screen", "card-panel"]);
+
+    await setCommand(["--root", root, "card", "surfaces", "-"]);
+    board = scanBoard(root);
+    assert.deepEqual(board.byId.get("card")?.surfaces, []);
   });
 
   it("rejects unknown kinds", async () => {
@@ -289,7 +388,7 @@ describe("check", () => {
 
 describe("view", () => {
   it("writes a self-contained page", async () => {
-    await addCommand(["--root", root, "Visible card", "-m", "1"]);
+    await addCommand(["--root", root, "Visible card", "-m", "1", "-s", "board-screen"]);
     await viewCommand(["--root", root, "--no-open"]);
 
     const file = path.join(root, ".couch-potator", "viewer", "board.html");
@@ -297,6 +396,7 @@ describe("view", () => {
     const html = readFileSync(file, "utf8");
     assert.ok(html.includes('id="board-data"'));
     assert.ok(html.includes("Visible card"));
+    assert.ok(html.includes("board-screen"));
     assert.ok(!html.includes("COUCH_POTATOR"));
     assert.ok(!html.includes("/api/state"));
     assert.ok(html.includes("read only"));

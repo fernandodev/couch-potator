@@ -96,6 +96,28 @@ describe("validateBoard", () => {
     assert.ok(warnings.some((message) => message.includes("no blocked_reason")));
   });
 
+  it("warns when two in-progress cards share a surface", () => {
+    write("in-progress", "left", "title: Left\nsurfaces: [board-screen]");
+    write("in-progress", "right", "title: Right\nsurfaces: [board-screen, search]");
+    const warnings = validateBoard(scanBoard(root))
+      .filter((issue) => issue.level === "warning")
+      .map((issue) => issue.message);
+    assert.ok(
+      warnings.some((message) =>
+        message.includes('in-progress cards "left" and "right" share surface "board-screen"'),
+      ),
+    );
+  });
+
+  it("does not warn when the shared surface is not in progress", () => {
+    write("todo", "left", "title: Left\nsurfaces: [board-screen]");
+    write("todo", "right", "title: Right\nsurfaces: [board-screen]");
+    const warnings = validateBoard(scanBoard(root))
+      .filter((issue) => issue.level === "warning")
+      .map((issue) => issue.message);
+    assert.ok(!warnings.some((message) => message.includes("share surface")));
+  });
+
   it("warns when current_milestone has no cards", () => {
     writeFileSync(
       path.join(root, "PROJECT.md"),

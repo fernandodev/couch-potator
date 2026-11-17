@@ -1,11 +1,11 @@
-import { mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { cyan, dim, green } from "../ansi.js";
 import { flag, list, parseCommandArgs, text, ROOT_OPTION } from "../args.js";
 import { nextOrder, scanBoard } from "../board.js";
-import { cardJson, today, writeCard, type Card } from "../card.js";
+import { cardJson, normaliseSurfaces, today, writeCard, type Card } from "../card.js";
 import { DEFAULT_KIND, isKind, resolveColumn } from "../columns.js";
-import { boardDir, relativeToRoot, resolveRoot } from "../config.js";
+import { boardDir, CONFIG_DIR, relativeToRoot, resolveRoot } from "../config.js";
 import { UsageError } from "../errors.js";
 import { parseMilestone, parseOrder, warn } from "../log.js";
 import { slugify, uniqueId } from "../slug.js";
@@ -19,15 +19,18 @@ const OPTIONS = {
   order: { type: "string" as const, short: "o" },
   "depends-on": { type: "string" as const, short: "d", multiple: true },
   related: { type: "string" as const, short: "r", multiple: true },
+  surface: { type: "string" as const, short: "s", multiple: true },
   body: { type: "string" as const, short: "b" },
   json: { type: "boolean" as const },
   root: ROOT_OPTION,
 };
 
-function bodyFrom(value: string | undefined): string {
-  if (value === undefined) return CARD_TEMPLATE;
+function bodyFrom(value: string | undefined, root: string): string {
   if (value === "-") return readFileSync(0, "utf8");
-  return readFileSync(path.resolve(value), "utf8");
+  if (value !== undefined) return readFileSync(path.resolve(value), "utf8");
+
+  const template = path.join(root, CONFIG_DIR, "templates", "card.md");
+  return existsSync(template) ? readFileSync(template, "utf8") : CARD_TEMPLATE;
 }
 
 export async function addCommand(argv: string[]): Promise<number> {
@@ -60,6 +63,7 @@ export async function addCommand(argv: string[]): Promise<number> {
 
   const dependsOn = list(values, "depends-on");
   const related = list(values, "related");
+  const surfaces = normaliseSurfaces(list(values, "surface"));
   for (const dependency of dependsOn) {
     if (!board.byId.has(dependency)) warn(`depends_on "${dependency}" does not exist yet.`);
   }
@@ -82,12 +86,13 @@ export async function addCommand(argv: string[]): Promise<number> {
     order,
     dependsOn,
     related,
+    surfaces,
     blockedReason: null,
     completed: null,
     resolution: null,
     created: today(),
     updated: today(),
-    body: bodyFrom(text(values, "body")),
+    body: bodyFrom(text(values, "body"), root),
     file,
     relFile: relativeToRoot(root, file),
     data: {},

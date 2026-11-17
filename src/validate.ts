@@ -170,6 +170,22 @@ export function validateBoard(board: Board): Issue[] {
     }
   }
 
+  const surfaceOwner = new Map<string, Card>();
+  for (const card of board.cards.filter((item) => item.status === "in-progress")) {
+    for (const surface of card.surfaces) {
+      const other = surfaceOwner.get(surface);
+      if (other) {
+        issues.push({
+          level: "warning",
+          message: `in-progress cards "${other.id}" and "${card.id}" share surface "${surface}"; build them one at a time.`,
+          file: relativeToRoot(root, card.file),
+        });
+      } else {
+        surfaceOwner.set(surface, card);
+      }
+    }
+  }
+
   for (const cycle of findCycles(board.cards)) {
     issues.push({
       level: "error",

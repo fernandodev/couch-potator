@@ -44,8 +44,25 @@ describe("completionCandidates", () => {
     const flags = completionCandidates({ current: "--", previous: ["add"] });
     assert.ok(flags.includes("--column"));
     assert.ok(flags.includes("--kind"));
+    assert.ok(flags.includes("--surface"));
     assert.ok(flags.includes("--root"));
     assert.ok(!flags.includes("--force"));
+  });
+
+  it("offers the body command and its cards and file flag", async () => {
+    const root = await makeBoard();
+    try {
+      assert.deepEqual(completionCandidates({ current: "bod", previous: [] }), ["body"]);
+      assert.deepEqual(completionCandidates({ current: "", previous: ["body"], root }), [
+        "reduce-cold-start",
+        "warm-pool",
+      ]);
+      const flags = completionCandidates({ current: "--", previous: ["body"] });
+      assert.ok(flags.includes("--file"));
+      assert.ok(flags.includes("--root"));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("completes columns", () => {

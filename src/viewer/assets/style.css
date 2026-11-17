@@ -894,6 +894,12 @@ input {
   color: #b23b3b;
 }
 
+.chip.surface {
+  background: #f3f0ff;
+  color: #5b3fa8;
+  border-color: #ded4fb;
+}
+
 /* ---------------------------------------------------------------- markdown */
 
 .markdown {

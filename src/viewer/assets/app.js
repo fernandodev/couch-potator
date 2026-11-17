@@ -763,6 +763,14 @@
 
     addRow("Depends on", spec.depends_on);
     addRow("Related", spec.related);
+    if (spec.surfaces && spec.surfaces.length) {
+      const items = spec.surfaces
+        .map((surface) => `<span class="chip surface">${esc(surface)}</span>`)
+        .join("");
+      rows.push(
+        `<div class="chip-row"><span class="chip-label">Surfaces</span>${items}</div>`,
+      );
+    }
     return rows.join("");
   }
 

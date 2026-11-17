@@ -16,6 +16,7 @@ export interface ViewerSpec {
   resolution: string | null;
   depends_on: string[];
   related: string[];
+  surfaces: string[];
   body: string;
 }
 
@@ -54,6 +55,7 @@ function specOf(card: Card): ViewerSpec {
     resolution: card.resolution,
     depends_on: card.dependsOn,
     related: card.related,
+    surfaces: card.surfaces,
     body: card.body,
   };
 }

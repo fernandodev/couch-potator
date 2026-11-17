@@ -16,6 +16,7 @@ export interface Card {
   order: number | null;
   dependsOn: string[];
   related: string[];
+  surfaces: string[];
   blockedReason: string | null;
   completed: string | null;
   resolution: string | null;
@@ -61,6 +62,21 @@ const asArray = (value: unknown): string[] => {
   return out;
 };
 
+/** Splits `"board-screen, card-panel"` into unique, trimmed surface names. */
+export function normaliseSurfaces(values: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of values) {
+    for (const part of String(value ?? "").split(/[,\s]+/)) {
+      const name = part.trim();
+      if (!name || seen.has(name)) continue;
+      seen.add(name);
+      out.push(name);
+    }
+  }
+  return out;
+}
+
 export function readCard(file: string, root: string, status: Column): Card {
   const raw = readFileSync(file, "utf8");
   let parsed: ReturnType<typeof parseMarkdown>;
@@ -88,6 +104,7 @@ export function readCard(file: string, root: string, status: Column): Card {
     order: asNumber(data.order),
     dependsOn: asArray(data.depends_on),
     related: asArray(data.related),
+    surfaces: normaliseSurfaces(asArray(data.surfaces)),
     blockedReason: asString(data.blocked_reason),
     completed: asString(data.completed),
     resolution: asString(data.resolution),
@@ -124,6 +141,7 @@ export function cardData(card: Card): Frontmatter {
   setOrDelete(data, "order", card.order);
   setOrDelete(data, "depends_on", card.dependsOn);
   setOrDelete(data, "related", card.related);
+  setOrDelete(data, "surfaces", card.surfaces);
   setOrDelete(data, "blocked_reason", card.blockedReason);
   setOrDelete(data, "completed", card.completed);
   setOrDelete(data, "resolution", card.resolution);
@@ -147,6 +165,7 @@ export interface CardJson {
   order: number | null;
   depends_on: string[];
   related: string[];
+  surfaces: string[];
   blocked_reason: string | null;
   completed: string | null;
   resolution: string | null;
@@ -166,6 +185,7 @@ export function cardJson(card: Card): CardJson {
     order: card.order,
     depends_on: card.dependsOn,
     related: card.related,
+    surfaces: card.surfaces,
     blocked_reason: card.blockedReason,
     completed: card.completed,
     resolution: card.resolution,

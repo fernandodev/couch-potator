@@ -39,6 +39,7 @@ export const COMMANDS = [
   "list",
   "ls",
   "show",
+  "body",
   "move",
   "mv",
   "set",
@@ -62,6 +63,7 @@ export const SET_FIELDS = [
   "priority",
   "order",
   "title",
+  "surfaces",
   "blocked_reason",
   "resolution",
   "completed",
@@ -100,6 +102,8 @@ const FLAGS: Record<string, Record<string, FlagSpec>> = {
     "--depends-on": { takesValue: true, source: "card" },
     "-r": { takesValue: true, source: "card" },
     "--related": { takesValue: true, source: "card" },
+    "-s": { takesValue: true },
+    "--surface": { takesValue: true },
     "-b": { takesValue: true },
     "--body": { takesValue: true },
     "--json": { takesValue: false },
@@ -119,6 +123,10 @@ const FLAGS: Record<string, Record<string, FlagSpec>> = {
     "--json": { takesValue: false },
     "--raw": { takesValue: false },
     "--path": { takesValue: false },
+  },
+  body: {
+    "-f": { takesValue: true },
+    "--file": { takesValue: true },
   },
   move: {
     "--top": { takesValue: false },
@@ -340,6 +348,7 @@ function positionalCandidates(
       if (index === 1) return COLUMN_VALUES;
       return [];
     case "show":
+    case "body":
     case "edit":
     case "rm":
       return index === 0 ? boardValues(root).cards : [];
@@ -484,8 +493,15 @@ function __couch_potator_arg
 end
 
 function __couch_potator_wants_file
-    set -l previous (commandline -opc)[-1]
-    contains -- $previous --body -b --root --out
+    set -l tokens (commandline -opc)
+    set -l previous $tokens[-1]
+    if contains -- $previous --body -b --file --root --out
+        return 0
+    end
+    if test (count $tokens) -ge 2; and test "$tokens[2]" = body; and contains -- $previous -f
+        return 0
+    end
+    return 1
 end
 
 complete -c couch-potator -f -a '(__couch_potator_arg)'

@@ -18,6 +18,7 @@ const CANONICAL_KEYS = [
   "order",
   "depends_on",
   "related",
+  "surfaces",
   "blocked_reason",
   "completed",
   "resolution",

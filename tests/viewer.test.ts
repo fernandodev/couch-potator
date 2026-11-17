@@ -29,7 +29,12 @@ beforeEach(() => {
     `---\nname: Viewer Demo\ncurrent_milestone: 2\nmilestones: [1, 2]\n---\n\n# Viewer Demo\n\nA brief.\n`,
   );
   write("todo", "base", "title: Base\nkind: foundation\nmilestone: 1");
-  write("todo", "next", "title: Next\ndepends_on: [base]\nmilestone: 2", "## Why\n\nNext body.\n");
+  write(
+    "todo",
+    "next",
+    "title: Next\ndepends_on: [base]\nsurfaces: [board-screen]\nmilestone: 2",
+    "## Why\n\nNext body.\n",
+  );
   write("blocked", "stuck", "title: Stuck\nmilestone: 2\nblocked_reason: waiting");
 });
 
@@ -57,6 +62,7 @@ describe("buildPayload", () => {
     const next = project.specs.find((spec) => spec.id === "next")!;
     assert.equal(next.status, "todo");
     assert.deepEqual(next.depends_on, ["base"]);
+    assert.deepEqual(next.surfaces, ["board-screen"]);
     assert.equal(next.file, "board/todo/next.md");
     assert.ok(next.body.includes("Next body."));
   });

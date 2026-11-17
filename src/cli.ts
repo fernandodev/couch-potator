@@ -2,6 +2,7 @@ import { createRequire } from "node:module";
 import { bold, cyan, dim, red } from "./ansi.js";
 import { addCommand } from "./commands/add.js";
 import { checkCommand } from "./commands/check.js";
+import { completeCommand, completionCommand } from "./commands/completion.js";
 import { editCommand } from "./commands/edit.js";
 import { graphCommand } from "./commands/graph.js";
 import { initCommand } from "./commands/init.js";
@@ -35,6 +36,8 @@ const COMMANDS: Record<string, Handler> = {
   view: viewCommand,
   board: viewCommand,
   skill: skillCommand,
+  completion: completionCommand,
+  __complete: completeCommand,
 };
 
 function version(): string {
@@ -70,9 +73,10 @@ function help(): void {
     ["graph", "Dependency graph: --format text|mermaid|dot"],
     ["view", "Build and open the read-only viewer (--watch, --no-open)"],
     ["skill", "Install .opencode/skills/board/SKILL.md and the AGENTS.md block"],
+    ["completion", "Print or install shell completions (bash|zsh|fish)"],
   ];
   for (const [name, description] of rows) {
-    console.log(`  ${cyan(name.padEnd(8))} ${description}`);
+    console.log(`  ${cyan(name.padEnd(10))} ${description}`);
   }
   console.log("");
   console.log(bold("Options"));

@@ -81,11 +81,50 @@ AGENTS.md                           # managed board block
 | `couch-potator graph [--format text\|mermaid\|dot] [-m <n>]` | Print the dependency graph without a browser. |
 | `couch-potator view [--watch] [--no-open] [--milestone <n\|all>] [--out <path>]` | Generate and open the read-only viewer. |
 | `couch-potator skill install [--force]` | (Re)install the OpenCode skill and the `AGENTS.md` block. |
+| `couch-potator completion [install] [bash\|zsh\|fish]` | Print or install shell completions (`sh` maps to bash). |
 
 Global: `--root <path>` anywhere, `--help`, `--version`.
 
 Exit codes: `0` success, `1` invalid board or failed validation, `2` usage error
 (unknown card, unknown column, bad flag).
+
+## Shell completions
+
+Install completions for the shell you use:
+
+```sh
+couch-potator completion install fish
+couch-potator completion install zsh
+couch-potator completion install bash
+```
+
+`completion` with no `install` prints the script instead, and `--print` forces
+printing even with `install`. Use `--no-rc` to write the script without touching
+your shell startup files.
+
+| Shell | File | Wiring |
+| --- | --- | --- |
+| fish | `~/.config/fish/completions/couch-potator.fish` | Loaded automatically by fish. |
+| zsh | `~/.config/couch-potator/completion.zsh` | Managed block in `~/.zshrc`. |
+| bash | `~/.local/share/bash-completion/completions/couch-potator` | Managed block in `~/.bashrc`. |
+
+The install is idempotent: rerunning it rewrites the script but keeps a single
+managed block, delimited by `# >>> couch-potator completions >>>` and
+`# <<< couch-potator completions <<<`. Restart the shell (or open a new tab) after
+installing.
+
+Completions are dynamic: the scripts call a hidden `__complete` command, so card
+ids, milestones, columns, kinds, formats and flags come from the board you are
+standing in. A missing or broken board never breaks the shell; you simply get
+commands and flags.
+
+To wire a script by hand:
+
+```sh
+source <(couch-potator completion bash)
+source <(couch-potator completion zsh)
+couch-potator completion fish > ~/.config/fish/completions/couch-potator.fish
+```
 
 ## Card format
 

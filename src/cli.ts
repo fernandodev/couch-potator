@@ -72,7 +72,7 @@ function help(): void {
     ["check", "Validate ids, links, cycles and columns"],
     ["graph", "Dependency graph: --format text|mermaid|dot"],
     ["view", "Build and open the read-only viewer (--watch, --no-open)"],
-    ["skill", "Install .opencode/skills/board/SKILL.md and the AGENTS.md block"],
+    ["skill", "Install .opencode/skills/couch-potator-board/SKILL.md and the AGENTS.md block"],
     ["completion", "Print or install shell completions (bash|zsh|fish)"],
   ];
   for (const [name, description] of rows) {

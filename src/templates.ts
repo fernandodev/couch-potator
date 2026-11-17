@@ -77,11 +77,11 @@ ${AGENTS_END}`;
 export function skillTemplate(context: TemplateContext): string {
   const { command, boardPath, briefPath } = context;
   return `---
-name: Board Viewer
-description: Read or update this project's spec board (${boardPath}/todo, in-progress, blocked, done) and open a read-only browser view with cards, rendered specs, milestones and a dependency graph. Use when the owner wants to see, add, move, or read a card or spec.
+name: couch-potator-board
+description: Read or update this project's couch-potator spec board (${boardPath}/todo, in-progress, blocked, done) and open a read-only browser view with cards, rendered specs, milestones and a dependency graph. Use when the owner wants to see, add, move, or read a card or spec.
 ---
 
-# Board
+# Couch Potator Board
 
 The board is a plain folder tree at \`${boardPath}/\`:
 

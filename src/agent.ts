@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { loadConfig, relativeToRoot } from "./config.js";
+import { parseMarkdown } from "./frontmatter.js";
 import {
   AGENTS_END,
   AGENTS_START,
@@ -9,9 +10,15 @@ import {
   type TemplateContext,
 } from "./templates.js";
 
+export const SKILL_NAME = "couch-potator-board";
+
+const LEGACY_SKILL_NAME = "board";
+const LEGACY_SKILL_TITLE = "Board Viewer";
+
 export interface InstallResult {
   written: string[];
   skipped: string[];
+  removed: string[];
 }
 
 export function templateContext(root: string): TemplateContext {
@@ -24,19 +31,44 @@ export function templateContext(root: string): TemplateContext {
   };
 }
 
+export function skillPath(root: string): string {
+  return path.join(root, ".opencode", "skills", SKILL_NAME, "SKILL.md");
+}
+
+// Earlier versions shipped `.opencode/skills/board/SKILL.md`. Remove it on
+// install so a renamed skill never leaves two competing copies behind.
+function removeLegacySkill(root: string, removed: string[]): void {
+  const dir = path.join(root, ".opencode", "skills", LEGACY_SKILL_NAME);
+  const file = path.join(dir, "SKILL.md");
+  if (!existsSync(file)) return;
+
+  try {
+    if (parseMarkdown(readFileSync(file, "utf8")).data.name !== LEGACY_SKILL_TITLE) return;
+  } catch {
+    return;
+  }
+
+  rmSync(file, { force: true });
+  if (!readdirSync(dir).length) rmSync(dir, { recursive: true, force: true });
+  removed.push(relativeToRoot(root, file));
+}
+
 export function installAgentFiles(root: string, options: { force?: boolean } = {}): InstallResult {
   const context = templateContext(root);
   const written: string[] = [];
   const skipped: string[] = [];
+  const removed: string[] = [];
 
-  const skillPath = path.join(root, ".opencode", "skills", "board", "SKILL.md");
-  if (!existsSync(skillPath) || options.force) {
-    mkdirSync(path.dirname(skillPath), { recursive: true });
-    writeFileSync(skillPath, skillTemplate(context), "utf8");
-    written.push(relativeToRoot(root, skillPath));
+  const skillFile = skillPath(root);
+  if (!existsSync(skillFile) || options.force) {
+    mkdirSync(path.dirname(skillFile), { recursive: true });
+    writeFileSync(skillFile, skillTemplate(context), "utf8");
+    written.push(relativeToRoot(root, skillFile));
   } else {
-    skipped.push(relativeToRoot(root, skillPath));
+    skipped.push(relativeToRoot(root, skillFile));
   }
+
+  removeLegacySkill(root, removed);
 
   const agentsPath = path.join(root, "AGENTS.md");
   const block = agentsBlock(context);
@@ -59,5 +91,5 @@ export function installAgentFiles(root: string, options: { force?: boolean } = {
     skipped.push(relativeToRoot(root, agentsPath));
   }
 
-  return { written, skipped };
+  return { written, skipped, removed };
 }

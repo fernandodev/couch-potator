@@ -53,11 +53,11 @@ couch-potator view
 
 ```text
 board/{todo,in-progress,blocked,done}/
-PROJECT.md                          # name, current milestone, brief
-.couch-potator/config.json          # paths
-.couch-potator/templates/card.md    # body used by `add`
-.opencode/skills/board/SKILL.md     # agent instructions
-AGENTS.md                           # managed board block
+PROJECT.md                                       # name, current milestone, brief
+.couch-potator/config.json                       # paths
+.couch-potator/templates/card.md                 # body used by `add`
+.opencode/skills/couch-potator-board/SKILL.md    # agent instructions
+AGENTS.md                                        # managed board block
 ```
 
 `.couch-potator/viewer/` is appended to `.gitignore`. Commit `board/`,
@@ -197,7 +197,7 @@ DOMPurify, both inlined into the page.
 
 ## Agents
 
-`init` writes `.opencode/skills/board/SKILL.md` and a managed block in
+`init` writes `.opencode/skills/couch-potator-board/SKILL.md` and a managed block in
 `AGENTS.md`. Both point at the CLI, so an agent can read the board with
 `list --json`, create cards, move them, link dependencies and validate with
 `check` instead of hand-editing YAML.

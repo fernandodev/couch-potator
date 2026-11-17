@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
@@ -43,12 +43,37 @@ describe("init", () => {
     assert.equal(existsSync(path.join(root, ".couch-potator", "config.json")), true);
     assert.equal(existsSync(path.join(root, "PROJECT.md")), true);
     assert.equal(existsSync(path.join(root, "AGENTS.md")), true);
-    assert.equal(existsSync(path.join(root, ".opencode", "skills", "board", "SKILL.md")), true);
+    assert.equal(
+      existsSync(path.join(root, ".opencode", "skills", "couch-potator-board", "SKILL.md")),
+      true,
+    );
     assert.ok(readFileSync(path.join(root, ".gitignore"), "utf8").includes(".couch-potator/viewer/"));
 
     const brief = parseMarkdown(readFileSync(path.join(root, "PROJECT.md"), "utf8"));
     assert.equal(brief.data.name, "Demo");
     assert.equal(brief.data.current_milestone, 1);
+  });
+
+  it("names the skill after the tool and matches its folder", () => {
+    const skill = parseMarkdown(
+      readFileSync(path.join(root, ".opencode", "skills", "couch-potator-board", "SKILL.md"), "utf8"),
+    );
+    assert.equal(skill.data.name, "couch-potator-board");
+    assert.match(String(skill.data.description), /couch-potator/);
+  });
+
+  it("removes the legacy board skill", async () => {
+    const legacy = path.join(root, ".opencode", "skills", "board", "SKILL.md");
+    mkdirSync(path.dirname(legacy), { recursive: true });
+    writeFileSync(legacy, "---\nname: Board Viewer\ndescription: old\n---\n\n# Board\n", "utf8");
+
+    await initCommand(["--root", root]);
+
+    assert.equal(existsSync(path.dirname(legacy)), false);
+    assert.equal(
+      existsSync(path.join(root, ".opencode", "skills", "couch-potator-board", "SKILL.md")),
+      true,
+    );
   });
 
   it("is idempotent and keeps an existing brief", async () => {

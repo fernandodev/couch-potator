@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { installAgentFiles } from "../agent.js";
-import { cyan, dim, green } from "../ansi.js";
+import { cyan, dim, green, yellow } from "../ansi.js";
 import { flag, parseCommandArgs, text, ROOT_OPTION } from "../args.js";
 import { COLUMNS } from "../columns.js";
 import {
@@ -32,6 +32,7 @@ export async function initCommand(argv: string[]): Promise<number> {
 
   const created: string[] = [];
   const existing: string[] = [];
+  const removed: string[] = [];
 
   const config = existsSync(configPath(root)) ? loadConfig(root) : DEFAULT_CONFIG;
   for (const column of COLUMNS) {
@@ -72,11 +73,13 @@ export async function initCommand(argv: string[]): Promise<number> {
     const result = installAgentFiles(root, { force: flag(values, "force") });
     created.push(...result.written);
     existing.push(...result.skipped);
+    removed.push(...result.removed);
   }
 
   console.log(`${green("Initialised")} board in ${cyan(root)}`);
   for (const item of created) console.log(`  ${green("+")} ${item}`);
   for (const item of existing) console.log(`  ${dim("=")} ${dim(item)}`);
+  for (const item of removed) console.log(`  ${yellow("-")} ${item}`);
   console.log("");
   console.log(`Next: ${cyan('couch-potator add "First card"')}`);
   return 0;

@@ -88,6 +88,7 @@ working state and later ideas.
 | `couch-potator edit <card>` | Open the spec in `$VISUAL`/`$EDITOR`. |
 | `couch-potator rm <card> [--force]` | Delete a card. |
 | `couch-potator check [--strict] [--json]` | Validate ids, links, cycles, orders, columns and in-progress surface collisions. Exit 1 on errors. |
+| `couch-potator next [--parallel <1-3>] [--json]` | Pick the next ready cards for the current milestone, in dependency/priority/order/kind order, and report the batch, held-back, waiting, blocked and in-progress cards. |
 | `couch-potator graph [--format text\|mermaid\|dot] [-m <n>]` | Print the dependency graph without a browser. |
 | `couch-potator view [--watch] [--no-open] [--milestone <n\|all>] [--out <path>]` | Generate and open the read-only viewer. |
 | `couch-potator skill install [--force]` | (Re)install both OpenCode skills and the `AGENTS.md` block. |
@@ -256,6 +257,35 @@ edges, so cross-milestone dependencies remain traceable.
 
 `related` and `surfaces` are not drawn as edges; they appear as chips in the spec
 modal.
+
+## Next ready cards
+
+`couch-potator next` is the implementation planner. It reads the current
+milestone from `PROJECT.md` and picks the cards that are ready to build:
+
+- a card is ready when it is in `todo/` for the current milestone, has no open
+  question, and every card in its `depends_on` is `done/`;
+- ready cards are ordered by priority (`must`, `should`, `could`), then the
+  board order, then kind (`foundation`, `feature`, `design`, `quality`, `fix`,
+  `release`), then id;
+- at most `--parallel` cards are offered (`1` by default, `3` at most), and two
+  cards that share a surface never appear in the same batch;
+- a card with no `surfaces` is treated as unknown and offered alone;
+- cards already in `in-progress/` are resumed first and take both a slot and
+  their surfaces.
+
+`--json` returns the same information for an agent: `batch`, `held_back` with a
+reason each, `waiting` with the unresolved dependencies, `blocked`, `done`,
+`in_progress`, `eligible`, `slots`, `errors` and `warnings`. The command exits
+`1` when the board has validation errors, so an implementer can stop before
+building.
+
+```sh
+couch-potator next
+couch-potator next --parallel 2 --json
+```
+
+`couch-potator check` validates the board. `couch-potator next` only reads it.
 
 ## The viewer
 

@@ -10,6 +10,7 @@ import { initCommand } from "./commands/init.js";
 import { linkCommand } from "./commands/link.js";
 import { listCommand } from "./commands/list.js";
 import { moveCommand } from "./commands/move.js";
+import { nextCommand } from "./commands/next.js";
 import { rmCommand } from "./commands/rm.js";
 import { setCommand } from "./commands/set.js";
 import { showCommand } from "./commands/show.js";
@@ -34,6 +35,7 @@ const COMMANDS: Record<string, Handler> = {
   edit: editCommand,
   rm: rmCommand,
   check: checkCommand,
+  next: nextCommand,
   graph: graphCommand,
   view: viewCommand,
   board: viewCommand,
@@ -73,6 +75,7 @@ function help(): void {
     ["edit", "Open a spec in $EDITOR"],
     ["rm", "Delete a card (--force)"],
     ["check", "Validate ids, links, cycles and columns"],
+    ["next", "Pick the next ready cards: --parallel N, --json"],
     ["graph", "Dependency graph: --format text|mermaid|dot"],
     ["view", "Build and open the read-only viewer (--watch, --no-open)"],
     ["skill", "Install the board, planner and unblock skills, /unblock, and AGENTS.md"],

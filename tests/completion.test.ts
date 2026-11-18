@@ -49,6 +49,13 @@ describe("completionCandidates", () => {
     assert.ok(!flags.includes("--force"));
   });
 
+  it("offers the next command and its flags", () => {
+    assert.deepEqual(completionCandidates({ current: "nex", previous: [] }), ["next"]);
+    const flags = completionCandidates({ current: "--", previous: ["next"] });
+    assert.ok(flags.includes("--parallel"));
+    assert.ok(flags.includes("--json"));
+  });
+
   it("offers the body command and its cards and file flag", async () => {
     const root = await makeBoard();
     try {

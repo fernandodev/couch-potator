@@ -48,6 +48,7 @@ export const COMMANDS = [
   "edit",
   "rm",
   "check",
+  "next",
   "graph",
   "view",
   "board",
@@ -147,6 +148,10 @@ const FLAGS: Record<string, Record<string, FlagSpec>> = {
   check: {
     "--json": { takesValue: false },
     "--strict": { takesValue: false },
+  },
+  next: {
+    "--parallel": { takesValue: true },
+    "--json": { takesValue: false },
   },
   graph: {
     "-f": { takesValue: true, source: "format" },

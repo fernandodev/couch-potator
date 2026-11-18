@@ -66,19 +66,24 @@ commit `dist/` or a packed `.tgz`.
 
 ## Generated agent files
 
-`couch-potator init` and `couch-potator skill install` write the board, planner
-and unblock skills, the `/unblock` command and the managed block in target
-projects' `AGENTS.md`. Their content lives in `src/templates.ts`.
+`couch-potator init` and `couch-potator skill install` write the board, planner,
+unblock and implement skills, the `/unblock` and `/implement` commands, the
+`couch-potator-implementer` and `couch-potator-integrator` subagents and the
+managed block in target projects' `AGENTS.md`. Their content lives in
+`src/templates.ts`.
 
 When changing generated files:
 
 - edit the template, never a generated copy in a target project;
 - update the README and the tests in the same commit;
-- keep `couch-potator-unblock` hidden with
+- keep `couch-potator-unblock` and `couch-potator-implement` hidden with
   `metadata.opencode/autoinvoke: false` unless the owner explicitly decides
   otherwise;
-- keep the installed command at `.opencode/commands/unblock.md` (plural
-  `commands/`; the singular `command/` directory is legacy).
+- keep the installed commands at `.opencode/commands/unblock.md` and
+  `.opencode/commands/implement.md` (plural `commands/`; the singular `command/`
+  directory is legacy);
+- keep the subagents at `.opencode/agents/` with `mode: subagent`; do not mark
+  them hidden, because the implement skill has to launch them.
 
 ## Rule of thumb
 

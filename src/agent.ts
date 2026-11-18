@@ -6,6 +6,10 @@ import {
   AGENTS_END,
   AGENTS_START,
   agentsBlock,
+  implementCommandTemplate,
+  implementerAgentTemplate,
+  implementSkillTemplate,
+  integratorAgentTemplate,
   plannerSkillTemplate,
   skillTemplate,
   unblockCommandTemplate,
@@ -16,7 +20,11 @@ import {
 export const SKILL_NAME = "couch-potator-board";
 export const PLANNER_SKILL_NAME = "couch-potator-planner";
 export const UNBLOCK_SKILL_NAME = "couch-potator-unblock";
+export const IMPLEMENT_SKILL_NAME = "couch-potator-implement";
 export const UNBLOCK_COMMAND_NAME = "unblock";
+export const IMPLEMENT_COMMAND_NAME = "implement";
+export const IMPLEMENTER_AGENT_NAME = "couch-potator-implementer";
+export const INTEGRATOR_AGENT_NAME = "couch-potator-integrator";
 
 const LEGACY_SKILL_NAME = "board";
 const LEGACY_SKILL_TITLE = "Board Viewer";
@@ -53,6 +61,22 @@ export function unblockCommandPath(root: string): string {
   return path.join(root, ".opencode", "commands", `${UNBLOCK_COMMAND_NAME}.md`);
 }
 
+export function implementSkillPath(root: string): string {
+  return path.join(root, ".opencode", "skills", IMPLEMENT_SKILL_NAME, "SKILL.md");
+}
+
+export function implementCommandPath(root: string): string {
+  return path.join(root, ".opencode", "commands", `${IMPLEMENT_COMMAND_NAME}.md`);
+}
+
+export function implementerAgentPath(root: string): string {
+  return path.join(root, ".opencode", "agents", `${IMPLEMENTER_AGENT_NAME}.md`);
+}
+
+export function integratorAgentPath(root: string): string {
+  return path.join(root, ".opencode", "agents", `${INTEGRATOR_AGENT_NAME}.md`);
+}
+
 // Earlier versions shipped `.opencode/skills/board/SKILL.md`. Remove it on
 // install so a renamed skill never leaves two competing copies behind.
 function removeLegacySkill(root: string, removed: string[]): void {
@@ -82,6 +106,10 @@ export function installAgentFiles(root: string, options: { force?: boolean } = {
     [plannerSkillPath(root), plannerSkillTemplate(context)],
     [unblockSkillPath(root), unblockSkillTemplate(context)],
     [unblockCommandPath(root), unblockCommandTemplate(context)],
+    [implementSkillPath(root), implementSkillTemplate(context)],
+    [implementCommandPath(root), implementCommandTemplate(context)],
+    [implementerAgentPath(root), implementerAgentTemplate(context)],
+    [integratorAgentPath(root), integratorAgentTemplate(context)],
   ];
 
   for (const [file, content] of agentFiles) {

@@ -68,6 +68,9 @@ export async function initCommand(argv: string[]): Promise<number> {
   (ensureLine(path.join(root, ".gitignore"), `${CONFIG_DIR}/viewer/`) ? created : existing).push(
     ".gitignore",
   );
+  (ensureLine(path.join(root, ".gitignore"), `${CONFIG_DIR}/worktrees/`) ? created : existing).push(
+    ".gitignore",
+  );
 
   if (!flag(values, "no-skill")) {
     const result = installAgentFiles(root, { force: flag(values, "force") });

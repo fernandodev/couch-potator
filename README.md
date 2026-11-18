@@ -1,8 +1,8 @@
 # couch-potator
 
 A folder-backed spec board for one project, with a read-only browser viewer,
-milestones, a dependency graph, and planner and unblock skills that turn an idea
-into plain-language specs.
+milestones, a dependency graph, and planner, unblock and implement skills that
+turn an idea into plain-language specs and then build them.
 
 No database, no server, no background process. The board is a directory of
 markdown files, and the viewer is a single generated HTML file you open with
@@ -61,6 +61,10 @@ PROJECT.md                                       # name, current milestone, brie
 .opencode/skills/couch-potator-planner/SKILL.md  # product planning for agents
 .opencode/skills/couch-potator-unblock/SKILL.md  # unblock workflow for agents
 .opencode/commands/unblock.md                    # /unblock prompt
+.opencode/skills/couch-potator-implement/SKILL.md   # implementation orchestration
+.opencode/commands/implement.md                     # /implement prompt
+.opencode/agents/couch-potator-implementer.md       # one-card worker subagent
+.opencode/agents/couch-potator-integrator.md        # rebase triage subagent
 AGENTS.md                                        # managed board block
 ```
 
@@ -69,8 +73,9 @@ discovery; the full scaffold covers vision, audience, journeys, constraints, sta
 decisions, design direction, glossary, milestones, decisions, open questions,
 working state and later ideas.
 
-`.couch-potator/viewer/` is appended to `.gitignore`. Commit `board/`,
-`PROJECT.md` and the config; leave the generated page out.
+`.couch-potator/viewer/` and `.couch-potator/worktrees/` are appended to
+`.gitignore`. Commit `board/`, `PROJECT.md` and the config; leave the generated
+page and the implementation worktrees out.
 
 ## Commands
 
@@ -92,7 +97,7 @@ working state and later ideas.
 | `couch-potator next [--parallel <1-3>] [--json]` | Pick the next ready cards for the current milestone, in dependency/priority/order/kind order, and report the batch, held-back, waiting, blocked and in-progress cards. |
 | `couch-potator graph [--format text\|mermaid\|dot] [-m <n>]` | Print the dependency graph without a browser. |
 | `couch-potator view [--watch] [--no-open] [--milestone <n\|all>] [--out <path>]` | Generate and open the read-only viewer. |
-| `couch-potator skill install [--force]` | (Re)install both OpenCode skills and the `AGENTS.md` block. |
+| `couch-potator skill install [--force]` | (Re)install every OpenCode agent file and the `AGENTS.md` block. |
 | `couch-potator completion [install] [bash\|zsh\|fish]` | Print or install shell completions (`sh` maps to bash). |
 
 Global: `--root <path>` anywhere, `--help`, `--version`.
@@ -102,13 +107,14 @@ Exit codes: `0` success, `1` invalid board or failed validation, `2` usage error
 
 ## Planning with an agent
 
-`init` installs three OpenCode skills:
+`init` installs four OpenCode skills:
 
 | Skill | Job |
 | --- | --- |
 | `couch-potator-board` | Board mechanics: read, add, body, move, link, validate, view. |
 | `couch-potator-planner` | Product planning: discovery, specs, milestones, questions, review. |
 | `couch-potator-unblock` | Unblocking: explain the block, ask the open questions, record the answers, return the card to `todo`. |
+| `couch-potator-implement` | Implementation: pick ready cards, run one worker per card in its own worktree, verify, merge one at a time. |
 
 The planner is the product manager. It does not write your product's code. It:
 
@@ -152,6 +158,54 @@ Definition of Ready. If an answer is still missing, the card stays in
 
 It never builds. The skill is hidden from automatic selection; `/unblock` loads
 it explicitly.
+
+## Implementing with an agent
+
+`couch-potator-implement` is the build counterpart to the planner. It reads the
+board, picks the next ready cards, gives each one to a **fresh implementer
+subagent** in its own git worktree, verifies the acceptance criteria, and merges
+the cards into the base branch one at a time.
+
+```text
+/implement                 # build the current milestone, one card at a time
+/implement --parallel 2    # up to two cards at once (the hard cap is 3)
+/implement --one           # stop after one batch is integrated
+/implement --dry-run       # print the plan and change nothing
+```
+
+It never writes your product's code itself, never invents product behaviour and
+never starts the next milestone. If the board is ambiguous it stops and asks,
+through the same `question` tool the planner uses.
+
+Before the first run it asks for the verification commands once and stores them
+with `couch-potator checks` (see above). `fast` commands run on every card
+branch, after every rebase and after every merge; `full` commands run once when
+the milestone is built.
+
+How a run works:
+
+1. It reads `PROJECT.md` and the board, and refuses to start on validation errors,
+   a dirty git tree or a non-`active` project.
+2. `couch-potator next` picks the batch: current milestone only, dependencies
+   done, ordered by priority, board order, kind and id, with cards that share a
+   `surface` kept apart.
+3. Each card moves to `in-progress/` and gets a branch `spec/<card-id>` and a
+   worktree at `.couch-potator/worktrees/spec-<card-id>`.
+4. One worker per card implements **one** card, runs the fast checks and returns
+   a `STATUS: DONE` or `STATUS: BLOCKED` report.
+5. The orchestrator reviews the diff, runs the fast checks, checks every
+   acceptance criterion and rebases onto the current base. A conflicted rebase
+   goes to the `couch-potator-integrator` subagent, which may only make
+   *mechanical* adaptations; a product conflict blocks the card.
+6. The card is squash-merged as one commit, moved to `done/` with a
+   `## Verification` section, and the worktree and branch are removed.
+7. Blocked cards go to `blocked/` with a `## Decision needed` section; the branch
+   is kept so the work survives.
+
+It never pushes, never forces, never merges two branches at once, and never
+marks a card done without verification. Only a single-worker run may launch the
+app for visual checks; with more workers, the orchestrator does it after the
+batch returns.
 
 ## Shell completions
 
@@ -337,22 +391,26 @@ DOMPurify, both inlined into the page.
 
 ## Agents
 
-`init` writes three skills, the `/unblock` command and a managed block in
-`AGENTS.md`:
+`init` writes four skills, the `/unblock` and `/implement` commands, two
+subagents and a managed block in `AGENTS.md`:
 
 | File | Purpose |
 | --- | --- |
 | `.opencode/skills/couch-potator-board/SKILL.md` | Board mechanics: CLI commands, viewer, validation rules. |
 | `.opencode/skills/couch-potator-planner/SKILL.md` | Product planning: discovery, spec contract, milestones, session protocol. |
 | `.opencode/skills/couch-potator-unblock/SKILL.md` | Unblock workflow: show the reason, ask, record, move ready cards to `todo`. |
+| `.opencode/skills/couch-potator-implement/SKILL.md` | Implementation orchestration: preflight, batches, worktrees, verification, merges. |
 | `.opencode/commands/unblock.md` | `/unblock` prompt that loads the unblock skill. |
+| `.opencode/commands/implement.md` | `/implement` prompt that loads the implement skill. |
+| `.opencode/agents/couch-potator-implementer.md` | Subagent that builds one card in a worktree and reports `STATUS: DONE` or `STATUS: BLOCKED`. |
+| `.opencode/agents/couch-potator-integrator.md` | Subagent that classifies a rebase collision as mechanical or product. |
 | `AGENTS.md` | A short managed block pointing every agent at the CLI and the skills. |
 
 All of them point at the CLI, so an agent can read the board with `list --json`,
 create cards, replace bodies, move them, link dependencies and validate with
 `check` instead of hand-editing YAML. The planner skill is the planning law, the
-unblock skill is the re-planning workflow, and the board skill is the mechanics
-reference.
+unblock skill is the re-planning workflow, the implement skill is the build
+orchestrator, and the board skill is the mechanics reference.
 
 `couch-potator skill install --force` rewrites every agent file.
 

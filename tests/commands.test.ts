@@ -57,7 +57,23 @@ describe("init", () => {
       true,
     );
     assert.equal(existsSync(path.join(root, ".opencode", "commands", "unblock.md")), true);
+    assert.equal(
+      existsSync(path.join(root, ".opencode", "skills", "couch-potator-implement", "SKILL.md")),
+      true,
+    );
+    assert.equal(existsSync(path.join(root, ".opencode", "commands", "implement.md")), true);
+    assert.equal(
+      existsSync(path.join(root, ".opencode", "agents", "couch-potator-implementer.md")),
+      true,
+    );
+    assert.equal(
+      existsSync(path.join(root, ".opencode", "agents", "couch-potator-integrator.md")),
+      true,
+    );
     assert.ok(readFileSync(path.join(root, ".gitignore"), "utf8").includes(".couch-potator/viewer/"));
+    assert.ok(
+      readFileSync(path.join(root, ".gitignore"), "utf8").includes(".couch-potator/worktrees/"),
+    );
 
     const brief = parseMarkdown(readFileSync(path.join(root, "PROJECT.md"), "utf8"));
     assert.equal(brief.data.name, "Demo");
@@ -68,7 +84,12 @@ describe("init", () => {
   });
 
   it("names the skills after the tool and their folders", () => {
-    for (const name of ["couch-potator-board", "couch-potator-planner", "couch-potator-unblock"]) {
+    for (const name of [
+      "couch-potator-board",
+      "couch-potator-planner",
+      "couch-potator-unblock",
+      "couch-potator-implement",
+    ]) {
       const skill = parseMarkdown(
         readFileSync(path.join(root, ".opencode", "skills", name, "SKILL.md"), "utf8"),
       );
@@ -114,6 +135,41 @@ describe("init", () => {
       "utf8",
     );
     assert.match(planner, /Load the `couch-potator-unblock` skill/);
+  });
+
+  it("hides the implement skill and installs its command and subagents", () => {
+    const skill = parseMarkdown(
+      readFileSync(
+        path.join(root, ".opencode", "skills", "couch-potator-implement", "SKILL.md"),
+        "utf8",
+      ),
+    );
+    assert.equal(skill.data.name, "couch-potator-implement");
+    assert.deepEqual(skill.data.metadata, { "opencode/autoinvoke": false });
+    assert.match(skill.body, /couch-potator next/);
+    assert.match(skill.body, /couch-potator checks/);
+    assert.match(skill.body, /spec\/<card-id>/);
+    assert.match(skill.body, /STATUS: DONE/);
+
+    const command = readFileSync(path.join(root, ".opencode", "commands", "implement.md"), "utf8");
+    assert.match(command, /\$ARGUMENTS/);
+    assert.match(command, /Load the `couch-potator-implement` skill/);
+    assert.match(command, /--parallel/);
+
+    const implementer = parseMarkdown(
+      readFileSync(path.join(root, ".opencode", "agents", "couch-potator-implementer.md"), "utf8"),
+    );
+    assert.equal(implementer.data.mode, "subagent");
+    assert.match(implementer.body, /STATUS: DONE/);
+    assert.match(implementer.body, /STATUS: BLOCKED/);
+    assert.match(implementer.body, /One commit/);
+
+    const integrator = parseMarkdown(
+      readFileSync(path.join(root, ".opencode", "agents", "couch-potator-integrator.md"), "utf8"),
+    );
+    assert.equal(integrator.data.mode, "subagent");
+    assert.match(integrator.body, /STATUS: REBASED/);
+    assert.match(integrator.body, /STATUS: PRODUCT CONFLICT/);
   });
 
   it("removes the legacy board skill", async () => {

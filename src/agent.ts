@@ -8,11 +8,15 @@ import {
   agentsBlock,
   plannerSkillTemplate,
   skillTemplate,
+  unblockCommandTemplate,
+  unblockSkillTemplate,
   type TemplateContext,
 } from "./templates.js";
 
 export const SKILL_NAME = "couch-potator-board";
 export const PLANNER_SKILL_NAME = "couch-potator-planner";
+export const UNBLOCK_SKILL_NAME = "couch-potator-unblock";
+export const UNBLOCK_COMMAND_NAME = "unblock";
 
 const LEGACY_SKILL_NAME = "board";
 const LEGACY_SKILL_TITLE = "Board Viewer";
@@ -41,6 +45,14 @@ export function plannerSkillPath(root: string): string {
   return path.join(root, ".opencode", "skills", PLANNER_SKILL_NAME, "SKILL.md");
 }
 
+export function unblockSkillPath(root: string): string {
+  return path.join(root, ".opencode", "skills", UNBLOCK_SKILL_NAME, "SKILL.md");
+}
+
+export function unblockCommandPath(root: string): string {
+  return path.join(root, ".opencode", "commands", `${UNBLOCK_COMMAND_NAME}.md`);
+}
+
 // Earlier versions shipped `.opencode/skills/board/SKILL.md`. Remove it on
 // install so a renamed skill never leaves two competing copies behind.
 function removeLegacySkill(root: string, removed: string[]): void {
@@ -65,12 +77,14 @@ export function installAgentFiles(root: string, options: { force?: boolean } = {
   const skipped: string[] = [];
   const removed: string[] = [];
 
-  const skills: Array<[string, string]> = [
+  const agentFiles: Array<[string, string]> = [
     [skillPath(root), skillTemplate(context)],
     [plannerSkillPath(root), plannerSkillTemplate(context)],
+    [unblockSkillPath(root), unblockSkillTemplate(context)],
+    [unblockCommandPath(root), unblockCommandTemplate(context)],
   ];
 
-  for (const [file, content] of skills) {
+  for (const [file, content] of agentFiles) {
     if (!existsSync(file) || options.force) {
       mkdirSync(path.dirname(file), { recursive: true });
       writeFileSync(file, content, "utf8");

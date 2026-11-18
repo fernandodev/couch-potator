@@ -52,6 +52,11 @@ describe("init", () => {
       existsSync(path.join(root, ".opencode", "skills", "couch-potator-planner", "SKILL.md")),
       true,
     );
+    assert.equal(
+      existsSync(path.join(root, ".opencode", "skills", "couch-potator-unblock", "SKILL.md")),
+      true,
+    );
+    assert.equal(existsSync(path.join(root, ".opencode", "commands", "unblock.md")), true);
     assert.ok(readFileSync(path.join(root, ".gitignore"), "utf8").includes(".couch-potator/viewer/"));
 
     const brief = parseMarkdown(readFileSync(path.join(root, "PROJECT.md"), "utf8"));
@@ -63,7 +68,7 @@ describe("init", () => {
   });
 
   it("names the skills after the tool and their folders", () => {
-    for (const name of ["couch-potator-board", "couch-potator-planner"]) {
+    for (const name of ["couch-potator-board", "couch-potator-planner", "couch-potator-unblock"]) {
       const skill = parseMarkdown(
         readFileSync(path.join(root, ".opencode", "skills", name, "SKILL.md"), "utf8"),
       );
@@ -83,6 +88,32 @@ describe("init", () => {
     assert.match(planner, /couch-potator add/);
     assert.match(planner, /couch-potator body/);
     assert.match(planner, /couch-potator check/);
+  });
+
+  it("hides the unblock skill and points /unblock at it", () => {
+    const unblock = parseMarkdown(
+      readFileSync(
+        path.join(root, ".opencode", "skills", "couch-potator-unblock", "SKILL.md"),
+        "utf8",
+      ),
+    );
+    assert.equal(unblock.data.name, "couch-potator-unblock");
+    assert.deepEqual(unblock.data.metadata, { "opencode/autoinvoke": false });
+    assert.match(unblock.body, /## Decision needed/);
+    assert.match(unblock.body, /Definition of Ready/);
+
+    const command = readFileSync(
+      path.join(root, ".opencode", "commands", "unblock.md"),
+      "utf8",
+    );
+    assert.match(command, /\$ARGUMENTS/);
+    assert.match(command, /Load the `couch-potator-unblock` skill/);
+
+    const planner = readFileSync(
+      path.join(root, ".opencode", "skills", "couch-potator-planner", "SKILL.md"),
+      "utf8",
+    );
+    assert.match(planner, /Load the `couch-potator-unblock` skill/);
   });
 
   it("removes the legacy board skill", async () => {

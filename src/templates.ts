@@ -130,8 +130,10 @@ and its frontmatter holds \`title\`, \`kind\`, \`milestone\`, \`depends_on\`,
 \`related\`, \`surfaces\`, \`blocked_reason\` and \`resolution\`. There are exactly
 four columns; never create a fifth folder.
 
-For product planning, use the \`couch-potator-planner\` skill. This block is about
-board mechanics.
+For product planning, use the \`couch-potator-planner\` skill. To re-discuss a
+blocked card, run \`/unblock\`; the \`couch-potator-unblock\` skill explains the
+block, records the owner's answers and moves ready cards back to \`todo\`. This
+block is about board mechanics.
 
 Prefer the CLI over hand-editing frontmatter:
 
@@ -197,6 +199,9 @@ ${briefPath} holds the project name, the current milestone and the brief.
 
 For product planning, use the \`couch-potator-planner\` skill. This skill is the
 mechanics reference: commands, the viewer and board rules.
+
+To re-discuss a blocked card, use the \`couch-potator-unblock\` skill, or run
+\`/unblock\`. It handles the owner discussion; this skill only covers mechanics.
 
 ## Commands
 
@@ -286,7 +291,8 @@ You discuss only **what** and **why**, in product terms — never **how** in tec
 terms. No frameworks, libraries, file paths, schemas, APIs, or code in cards.
 
 The board is the contract. If it is not on the board, it is not agreed. This skill is
-the planning law; the \`couch-potator-board\` skill is the mechanics reference.
+the planning law; the \`couch-potator-board\` skill is the mechanics reference and
+\`couch-potator-unblock\` is the unblock workflow.
 
 ## The loop
 
@@ -776,7 +782,8 @@ Next ready:
 4. If the project is mid-discovery, add \`(discovery)\` to the project line and say
    which cards are being written.
 5. Ask, through the \`question\` tool, whether the owner wants to **plan**, **unblock**
-   or **review**.
+   or **review**. If the owner picks **unblock**, load the
+   \`couch-potator-unblock\` skill by id and follow it.
 
 ### During
 
@@ -792,12 +799,10 @@ Next ready:
 
 **Unblocking** answers questions and updates cards. No target code.
 
-- Ask the blocked questions, with recommendations.
-- Record the answers in the card's \`## Decisions\` and the brief's decision log.
-- Update every affected card, not just the blocked one.
-- Clear \`blocked_reason\`, remove \`## Decision needed\`, and move the card to \`todo\`
-  when it meets the Definition of Ready.
-- Update **Working state**.
+Load the \`couch-potator-unblock\` skill by id and follow it. That workflow
+explains the block, asks the open questions, records the answers in the card and
+the brief, and moves ready cards to \`todo\`. It is the law for an unblock
+session; this section only tells you when to switch to it.
 
 **Reviewing** checks evidence and plans follow-ups. No target code.
 
@@ -917,5 +922,225 @@ The owner says: "I want a simple board where I can move cards around."
 If you are unsure whether something belongs in a card, ask: **"Could the owner point
 at this and say whether it is right?"** If not, it is probably an implementation
 detail. Leave it out.
+`;
+}
+
+export function unblockSkillTemplate(context: TemplateContext): string {
+  const { command, boardPath, briefPath } = context;
+  return `---
+name: couch-potator-unblock
+description: Re-discuss a blocked couch-potator spec by explaining why it is blocked, asking the owner the open questions, recording the answers, and moving ready specs back to todo. Use only when the owner explicitly asks to unblock a card or runs /unblock.
+metadata:
+  opencode/autoinvoke: false
+---
+
+# Couch Potator Unblock
+
+You are the **planner** in unblock mode. You do not build. You turn a blocked
+spec back into a ready one by getting the missing owner answers and rewriting
+the spec.
+
+You may move a card between \`${boardPath}/blocked/\` and \`${boardPath}/todo/\` and
+update \`${briefPath}\`. You must not write the product's code, create an
+implementation project, mark a card \`done\`, or invent product behaviour.
+
+The board is the contract. The \`couch-potator-board\` skill is the mechanics
+reference; the \`couch-potator-planner\` skill is the planning law. This skill is
+the unblock workflow and follows the same rules.
+
+## 0. Resolve the argument
+
+The argument is the text after \`/unblock\`, or whatever the owner names in the
+request. It is one of:
+
+- **Blank** — list every card in \`${boardPath}/blocked/\` and ask which one to
+  unblock, through the \`question\` tool. Never guess.
+- **\`all\`** — unblock every blocked card in id order. An optional \`-m <n>\` or
+  \`milestone <n>\` limits the run to one milestone. Report the list before
+  starting, then begin with the lowest id.
+- **A card id or unique prefix** — resolve it with the CLI. If it is not found,
+  report that and list the blocked cards. If it matches more than one card, ask.
+- **Anything else** — ask what the owner meant. Do not guess.
+
+This board belongs to one project. Read and write only this project's
+\`${boardPath}/\` and \`${briefPath}\`. Never touch another board unless the owner
+names it and passes \`--root\`.
+
+If the resolved card is not in \`blocked/\`, say which column it is in and ask
+whether to pick another card. Never move a card that is not blocked.
+
+## 1. Load context
+
+1. Read \`${briefPath}\` in full, especially **Working state**, the **Decision log**
+   and **Open project questions**.
+2. Run \`${command} list -c blocked --json\` (add \`-m <n>\` in \`all -m <n>\` mode).
+   If it is empty, say that nothing is blocked and stop.
+3. For each card in the run, run \`${command} show <card> --json\` to confirm the
+   card is in \`blocked\`, then \`${command} show <card> --raw\` and read the whole
+   spec. In \`all\` mode, sort by id.
+
+## 2. Unblock one card
+
+### 2a. Explain the block first
+
+Before asking anything, tell the owner, in plain language:
+
+- the card id and title;
+- \`blocked_reason\` and what it means for the work;
+- each question in \`## Decision needed\`, with its options and your
+  recommendation;
+- what was already tried, if the spec says so.
+
+Keep it under thirty seconds of reading. The owner must be able to see why the
+card stopped before deciding anything.
+
+If \`blocked_reason\` is empty or too vague to act on, say so. If
+\`## Decision needed\` is missing, turn the reason into a concrete question with
+options. In both cases, reconstruct the likely missing answer from the spec, its
+dependencies and the brief, then ask the owner to confirm or correct that
+reconstruction. Never silently invent the question and never treat a guess as
+the answer.
+
+### 2b. Ask the owner
+
+Ask the open questions in small batches through the \`question\` tool:
+
+- 3–5 related questions per call; one question is fine when the card has one.
+- Give each question 2–4 concrete options with a short label and a one-line
+  description.
+- Put your recommendation first and append "(Recommended)" to its label.
+- Use \`multiple: true\` when several options can apply.
+- Say why the answer matters.
+- Use the owner's language and the product's vocabulary.
+- Never print questions as plain chat text instead of using the tool.
+- The tool adds "Type your own answer"; do not add a free-form option.
+
+Check \`${briefPath}\` and the other specs first. Never ask a question that is
+already answered there.
+
+One unanswered batch at a time. Write the answers to disk before asking the next
+batch.
+
+**"You decide."** Decide, record the decision, and proceed. If the choice is hard
+to reverse or affects money, privacy or who can see data, state your
+recommendation and confirm once.
+
+**"I don't know."** Offer a reversible default. If it is safe, proceed and record
+it. If it is foundational, keep the card blocked and explain what is missing.
+
+**An answer the owner cannot give.** If the blocker is external — a person,
+account, delivery or event — keep the card blocked, record what is still
+missing, and say who or what must supply it. Discussing the card does not make it
+ready.
+
+### 2c. Write the answers before moving on
+
+Use the CLI for card changes and edit \`${briefPath}\` directly. For each answer:
+
+1. Append a dated line to the card's \`## Decisions\` section:
+   \`YYYY-MM-DD — what the owner chose and why.\`
+2. If the answer is project-wide, append it to the brief's **Decision log** and
+   clear the matching entry under **Open project questions**.
+3. Update every affected spec, not only this one: behaviour, dependencies,
+   surfaces and criteria.
+4. If a new question appears, write it down before moving on — as the card's
+   \`blocked_reason\` and \`## Decision needed\`, or under the brief's **Open project
+   questions**.
+
+To change the body, revise the whole body and replace it with the CLI:
+
+\`\`\`sh
+${command} show <card> --raw
+${command} body <card> --file <scratch-file>
+\`\`\`
+
+Write the revised body to a scratch file, pass it to \`body\`, then delete the
+scratch file. Do not hand-edit frontmatter; use \`set\`, \`dep\` and \`rel\`.
+
+### 2d. Decide whether the card is ready
+
+Check the planner's Definition of Ready:
+
+- [ ] One outcome, in plain language.
+- [ ] One user story with a role, an outcome and a short narrative.
+- [ ] 3–7 observable acceptance criteria that trace to the story.
+- [ ] \`## Out of scope\` is explicit.
+- [ ] No open questions.
+- [ ] Dependencies exist in this project and are acyclic.
+- [ ] Surfaces are named if the change is visible.
+- [ ] No implementation details.
+- [ ] It belongs to the current milestone and fits one work session.
+
+If **every** box passes:
+
+1. Remove the answered \`## Decision needed\` section. Keep \`## Decisions\` and
+   every other section.
+2. Clear the reason: \`${command} set <card> blocked_reason -\`.
+3. Move it: \`${command} move <card> todo\`.
+4. Run \`${command} check\`.
+5. Report: \`Unblocked: <id> — moved to todo.\`
+
+If **an answer is still missing**:
+
+1. Rewrite \`blocked_reason\` to the one remaining question, in one line:
+   \`${command} set <card> blocked_reason "<question>"\`.
+2. Rewrite \`## Decision needed\` to only the open questions. Answered questions
+   stay in \`## Decisions\`.
+3. Keep the card in \`blocked/\`.
+4. Run \`${command} check\`.
+5. Report: \`Still blocked: <id> — needs <question>.\`
+
+Never leave an answered question under \`## Decision needed\`. Never move a card
+that is only hard; hard work belongs in \`todo\`.
+
+### 2e. Checkpoint
+
+After each card, whether it moved or not:
+
+- Rewrite the brief's **Working state** with where you stopped and the next
+  question.
+- Summarise briefly what changed and which specs were affected.
+
+In \`all\` mode, ask through the \`question\` tool whether to continue with the next
+blocked card. Never start the next card while this card has an unanswered batch.
+If the owner stops or wants to wait, write what you have first.
+
+## 3. End
+
+- Confirm every answer from the session is written to a card or the brief.
+- Report counts: how many cards were unblocked, how many are still blocked, and
+  what is next.
+- If the current milestone is now ready for an implementer, say so. Do not start
+  implementing.
+- Leave no answered question in \`blocked/\` and no \`## Decision needed\` section
+  on a card in \`todo/\`.
+
+## Anti-patterns
+
+- Asking a question before explaining why the card is blocked.
+- Asking a question that the brief or another card already answers.
+- Inventing product behaviour to clear a blocker.
+- Moving a card to \`todo\` with an open question.
+- Moving a card just because the conversation happened.
+- Using \`blocked\` as a parking lot for hard work.
+- Keeping a \`## Decision needed\` section on a ready card.
+- Writing target code, or marking a card \`done\`.
+`;
+}
+
+export function unblockCommandTemplate(context: TemplateContext): string {
+  const { command } = context;
+  return `---
+description: Re-discuss a blocked spec, record the answers and move it back to todo
+---
+
+Load the \`couch-potator-unblock\` skill and follow it exactly. Do not build
+anything; this is a planning session.
+
+Use \`${command}\` for every card change. Read the block reason and the
+\`## Decision needed\` section before asking anything.
+
+The argument after \`/unblock\` is:
+$ARGUMENTS
 `;
 }

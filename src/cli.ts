@@ -75,7 +75,7 @@ function help(): void {
     ["check", "Validate ids, links, cycles and columns"],
     ["graph", "Dependency graph: --format text|mermaid|dot"],
     ["view", "Build and open the read-only viewer (--watch, --no-open)"],
-    ["skill", "Install the board and planner skills plus the AGENTS.md block"],
+    ["skill", "Install the board, planner and unblock skills, /unblock, and AGENTS.md"],
     ["completion", "Print or install shell completions (bash|zsh|fish)"],
   ];
   for (const [name, description] of rows) {

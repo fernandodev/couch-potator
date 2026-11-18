@@ -1,8 +1,8 @@
 # couch-potator
 
 A folder-backed spec board for one project, with a read-only browser viewer,
-milestones, a dependency graph, and a planner skill that turns an idea into
-plain-language specs.
+milestones, a dependency graph, and planner and unblock skills that turn an idea
+into plain-language specs.
 
 No database, no server, no background process. The board is a directory of
 markdown files, and the viewer is a single generated HTML file you open with
@@ -59,6 +59,8 @@ PROJECT.md                                       # name, current milestone, brie
 .couch-potator/templates/card.md                 # full spec body used by `add`
 .opencode/skills/couch-potator-board/SKILL.md    # board mechanics for agents
 .opencode/skills/couch-potator-planner/SKILL.md  # product planning for agents
+.opencode/skills/couch-potator-unblock/SKILL.md  # unblock workflow for agents
+.opencode/commands/unblock.md                    # /unblock prompt
 AGENTS.md                                        # managed board block
 ```
 
@@ -98,12 +100,13 @@ Exit codes: `0` success, `1` invalid board or failed validation, `2` usage error
 
 ## Planning with an agent
 
-`init` installs two OpenCode skills:
+`init` installs three OpenCode skills:
 
 | Skill | Job |
 | --- | --- |
 | `couch-potator-board` | Board mechanics: read, add, body, move, link, validate, view. |
 | `couch-potator-planner` | Product planning: discovery, specs, milestones, questions, review. |
+| `couch-potator-unblock` | Unblocking: explain the block, ask the open questions, record the answers, return the card to `todo`. |
 
 The planner is the product manager. It does not write your product's code. It:
 
@@ -123,6 +126,30 @@ decisions.
 To use it, start an OpenCode session in the project and ask the planner to plan the
 product or the next milestone. If the board is missing, run `couch-potator init`
 first. The planner will tell you the same.
+
+### Unblocking a card
+
+A blocked card carries a `blocked_reason` and a `## Decision needed` section with
+the owner's open questions. Start an unblock session with:
+
+```text
+/unblock                 # list the blocked cards and ask which one
+/unblock <card>          # unblock one card
+/unblock all             # every blocked card, one at a time, in id order
+/unblock all -m 2        # only milestone 2
+```
+
+The `couch-potator-unblock` skill shows the reason and the open questions before
+asking anything, then asks in small batches through OpenCode's `question` tool,
+with a recommendation for each. It writes every answer to the card's
+`## Decisions` and, when the answer is project-wide, to the decision log in
+`PROJECT.md`. It then clears `blocked_reason`, removes the answered
+`## Decision needed` section, and moves the card to `todo/` once it meets the
+Definition of Ready. If an answer is still missing, the card stays in
+`blocked/` with only the remaining question.
+
+It never builds. The skill is hidden from automatic selection; `/unblock` loads
+it explicitly.
 
 ## Shell completions
 
@@ -251,20 +278,24 @@ DOMPurify, both inlined into the page.
 
 ## Agents
 
-`init` writes two skills and a managed block in `AGENTS.md`:
+`init` writes three skills, the `/unblock` command and a managed block in
+`AGENTS.md`:
 
 | File | Purpose |
 | --- | --- |
 | `.opencode/skills/couch-potator-board/SKILL.md` | Board mechanics: CLI commands, viewer, validation rules. |
 | `.opencode/skills/couch-potator-planner/SKILL.md` | Product planning: discovery, spec contract, milestones, session protocol. |
-| `AGENTS.md` | A short managed block pointing every agent at the CLI and the two skills. |
+| `.opencode/skills/couch-potator-unblock/SKILL.md` | Unblock workflow: show the reason, ask, record, move ready cards to `todo`. |
+| `.opencode/commands/unblock.md` | `/unblock` prompt that loads the unblock skill. |
+| `AGENTS.md` | A short managed block pointing every agent at the CLI and the skills. |
 
-All three point at the CLI, so an agent can read the board with `list --json`,
+All of them point at the CLI, so an agent can read the board with `list --json`,
 create cards, replace bodies, move them, link dependencies and validate with
-`check` instead of hand-editing YAML. The planner skill is the planning law; the
-board skill is the mechanics reference.
+`check` instead of hand-editing YAML. The planner skill is the planning law, the
+unblock skill is the re-planning workflow, and the board skill is the mechanics
+reference.
 
-`couch-potator skill install --force` rewrites all three files.
+`couch-potator skill install --force` rewrites every agent file.
 
 ## Design notes
 

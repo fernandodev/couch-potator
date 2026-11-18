@@ -55,7 +55,7 @@ couch-potator view
 ```text
 board/{todo,in-progress,blocked,done}/
 PROJECT.md                                       # name, current milestone, brief
-.couch-potator/config.json                       # paths
+.couch-potator/config.json                       # paths and verification checks
 .couch-potator/templates/card.md                 # full spec body used by `add`
 .opencode/skills/couch-potator-board/SKILL.md    # board mechanics for agents
 .opencode/skills/couch-potator-planner/SKILL.md  # product planning for agents
@@ -88,6 +88,7 @@ working state and later ideas.
 | `couch-potator edit <card>` | Open the spec in `$VISUAL`/`$EDITOR`. |
 | `couch-potator rm <card> [--force]` | Delete a card. |
 | `couch-potator check [--strict] [--json]` | Validate ids, links, cycles, orders, columns and in-progress surface collisions. Exit 1 on errors. |
+| `couch-potator checks [--json]` / `checks set <fast\|full> <name> "<command>"` / `checks clear <fast\|full> [name]` | Show or edit the verification commands the implement skill runs. |
 | `couch-potator next [--parallel <1-3>] [--json]` | Pick the next ready cards for the current milestone, in dependency/priority/order/kind order, and report the batch, held-back, waiting, blocked and in-progress cards. |
 | `couch-potator graph [--format text\|mermaid\|dot] [-m <n>]` | Print the dependency graph without a browser. |
 | `couch-potator view [--watch] [--no-open] [--milestone <n\|all>] [--out <path>]` | Generate and open the read-only viewer. |
@@ -286,6 +287,34 @@ couch-potator next --parallel 2 --json
 ```
 
 `couch-potator check` validates the board. `couch-potator next` only reads it.
+
+## Verification checks
+
+`couch-potator check` (singular) validates the board. `couch-potator checks`
+(plural) is the list of commands the implement skill runs to verify a card. They
+live in `.couch-potator/config.json` and are grouped by when they run:
+
+- **fast** — install, test, lint and typecheck. Run on every card branch, after
+  every rebase and after every merge.
+- **full** — build and package. Run once on the base branch when the milestone
+  is complete, not per card.
+
+```sh
+couch-potator checks
+couch-potator checks --json
+couch-potator checks set fast install "npm ci"
+couch-potator checks set fast test "npm test"
+couch-potator checks set fast lint "npm run lint"
+couch-potator checks set fast typecheck "npm run typecheck"
+couch-potator checks set full build "npm run build"
+couch-potator checks clear fast lint
+couch-potator checks clear full
+```
+
+A stack that does not need a step simply leaves it out; an empty phase is not a
+failed check. `--json` prints `{ "fast": { ... }, "full": { ... } }` for an
+agent. The implement skill asks for the commands once, writes them here, and
+reuses them.
 
 ## The viewer
 

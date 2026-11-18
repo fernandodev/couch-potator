@@ -49,6 +49,23 @@ describe("completionCandidates", () => {
     assert.ok(!flags.includes("--force"));
   });
 
+  it("offers the checks command, its actions and phases", () => {
+    assert.deepEqual(completionCandidates({ current: "chec", previous: [] }), [
+      "check",
+      "checks",
+    ]);
+    assert.deepEqual(completionCandidates({ current: "", previous: ["checks"] }), [
+      "set",
+      "clear",
+    ]);
+    assert.deepEqual(completionCandidates({ current: "", previous: ["checks", "set"] }), [
+      "fast",
+      "full",
+    ]);
+    const flags = completionCandidates({ current: "--", previous: ["checks"] });
+    assert.ok(flags.includes("--json"));
+  });
+
   it("offers the next command and its flags", () => {
     assert.deepEqual(completionCandidates({ current: "nex", previous: [] }), ["next"]);
     const flags = completionCandidates({ current: "--", previous: ["next"] });

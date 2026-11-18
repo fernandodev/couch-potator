@@ -3,6 +3,7 @@ import { bold, cyan, dim, red } from "./ansi.js";
 import { addCommand } from "./commands/add.js";
 import { bodyCommand } from "./commands/body.js";
 import { checkCommand } from "./commands/check.js";
+import { checksCommand } from "./commands/checks.js";
 import { completeCommand, completionCommand } from "./commands/completion.js";
 import { editCommand } from "./commands/edit.js";
 import { graphCommand } from "./commands/graph.js";
@@ -35,6 +36,7 @@ const COMMANDS: Record<string, Handler> = {
   edit: editCommand,
   rm: rmCommand,
   check: checkCommand,
+  checks: checksCommand,
   next: nextCommand,
   graph: graphCommand,
   view: viewCommand,
@@ -75,6 +77,7 @@ function help(): void {
     ["edit", "Open a spec in $EDITOR"],
     ["rm", "Delete a card (--force)"],
     ["check", "Validate ids, links, cycles and columns"],
+    ["checks", "Configure verification commands: set|clear fast|full <name>"],
     ["next", "Pick the next ready cards: --parallel N, --json"],
     ["graph", "Dependency graph: --format text|mermaid|dot"],
     ["view", "Build and open the read-only viewer (--watch, --no-open)"],

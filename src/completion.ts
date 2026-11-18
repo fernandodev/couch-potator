@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { milestonesOf, scanBoard } from "./board.js";
 import { COLUMNS, KINDS } from "./columns.js";
-import { findRoot } from "./config.js";
+import { CHECK_PHASES, findRoot } from "./config.js";
 
 export const SHELLS = ["bash", "zsh", "fish"] as const;
 export type Shell = (typeof SHELLS)[number];
@@ -48,6 +48,7 @@ export const COMMANDS = [
   "edit",
   "rm",
   "check",
+  "checks",
   "next",
   "graph",
   "view",
@@ -148,6 +149,9 @@ const FLAGS: Record<string, Record<string, FlagSpec>> = {
   check: {
     "--json": { takesValue: false },
     "--strict": { takesValue: false },
+  },
+  checks: {
+    "--json": { takesValue: false },
   },
   next: {
     "--parallel": { takesValue: true },
@@ -369,6 +373,10 @@ function positionalCandidates(
     case "rel":
       if (index === 0) return ["add", "rm", ...boardValues(root).cards];
       if (index <= 2) return boardValues(root).cards;
+      return [];
+    case "checks":
+      if (index === 0) return ["set", "clear"];
+      if (index === 1) return [...CHECK_PHASES];
       return [];
     case "skill":
       return index === 0 ? ["install"] : [];

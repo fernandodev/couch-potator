@@ -4,6 +4,12 @@ import { CliError } from "./errors.js";
 
 export const CONFIG_DIR = ".couch-potator";
 
+export const CHECK_PHASES = ["fast", "full"] as const;
+export type CheckPhase = (typeof CHECK_PHASES)[number];
+
+/** Named shell commands, grouped by when the implementer runs them. */
+export type Checks = Record<CheckPhase, Record<string, string>>;
+
 export interface Config {
   version: 1;
   board: string;
@@ -11,7 +17,10 @@ export interface Config {
   viewer: {
     out: string;
   };
+  checks: Checks;
 }
+
+export const emptyChecks = (): Checks => ({ fast: {}, full: {} });
 
 export const DEFAULT_CONFIG: Config = {
   version: 1,
@@ -20,7 +29,24 @@ export const DEFAULT_CONFIG: Config = {
   viewer: {
     out: `${CONFIG_DIR}/viewer/board.html`,
   },
+  checks: emptyChecks(),
 };
+
+function normaliseChecks(value: unknown): Checks {
+  const checks = emptyChecks();
+  if (!value || typeof value !== "object" || Array.isArray(value)) return checks;
+
+  for (const phase of CHECK_PHASES) {
+    const group = (value as Record<string, unknown>)[phase];
+    if (!group || typeof group !== "object" || Array.isArray(group)) continue;
+    for (const [name, command] of Object.entries(group as Record<string, unknown>)) {
+      if (typeof command === "string" && command.trim()) {
+        checks[phase][name] = command.trim();
+      }
+    }
+  }
+  return checks;
+}
 
 export function configPath(root: string): string {
   return path.join(root, CONFIG_DIR, "config.json");
@@ -58,7 +84,13 @@ export function resolveRoot(explicit?: string): string {
 
 export function loadConfig(root: string): Config {
   const file = configPath(root);
-  if (!existsSync(file)) return { ...DEFAULT_CONFIG, viewer: { ...DEFAULT_CONFIG.viewer } };
+  if (!existsSync(file)) {
+    return {
+      ...DEFAULT_CONFIG,
+      viewer: { ...DEFAULT_CONFIG.viewer },
+      checks: emptyChecks(),
+    };
+  }
 
   let parsed: unknown;
   try {
@@ -78,6 +110,7 @@ export function loadConfig(root: string): Config {
           ? source.viewer.out
           : DEFAULT_CONFIG.viewer.out,
     },
+    checks: normaliseChecks(source.checks),
   };
 }
 

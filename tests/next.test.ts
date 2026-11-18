@@ -139,8 +139,20 @@ describe("next errors and output", () => {
     assert.equal(parsed.errors.length > 0, true);
   });
 
-  it("rejects a parallel width outside 1 to 3", async () => {
-    await assert.rejects(() => nextCommand(["--root", root, "--parallel", "4"]), /between 1 and 3/);
+  it("clamps a parallel width above 3 and explains it", async () => {
+    await add("Ready");
+    output.clear();
+
+    const code = await nextCommand(["--root", root, "--parallel", "9", "--json"]);
+    assert.equal(code, 0);
+    const parsed = JSON.parse(output.logs.join(""));
+    assert.equal(parsed.parallel, 3);
+    assert.match(parsed.warnings.join("\n"), /above the cap; using 3/);
+  });
+
+  it("rejects a parallel width below 1", async () => {
+    await assert.rejects(() => nextCommand(["--root", root, "--parallel", "0"]), /at least 1/);
+    await assert.rejects(() => nextCommand(["--root", root, "--parallel", "two"]), /at least 1/);
   });
 
   it("prints a human plan with batch, held back and waiting sections", async () => {

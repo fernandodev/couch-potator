@@ -325,14 +325,18 @@ export async function nextCommand(argv: string[]): Promise<number> {
   const root = resolveRoot(text(values, "root"));
 
   const rawParallel = text(values, "parallel") ?? String(MIN_PARALLEL);
-  const parallel = Number(rawParallel);
-  if (!Number.isInteger(parallel) || parallel < MIN_PARALLEL || parallel > MAX_PARALLEL) {
-    throw new UsageError(`--parallel must be between ${MIN_PARALLEL} and ${MAX_PARALLEL}.`, {
+  const requested = Number(rawParallel);
+  if (!Number.isInteger(requested) || requested < MIN_PARALLEL) {
+    throw new UsageError(`--parallel must be at least ${MIN_PARALLEL}.`, {
       details: [`Got "${rawParallel}".`],
     });
   }
 
+  const parallel = Math.min(requested, MAX_PARALLEL);
   const result = analyseNext(root, parallel);
+  if (requested > MAX_PARALLEL) {
+    result.warnings.push(`--parallel ${requested} is above the cap; using ${MAX_PARALLEL}.`);
+  }
 
   if (flag(values, "json")) {
     console.log(JSON.stringify(result, null, 2));

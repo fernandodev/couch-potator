@@ -1,5 +1,9 @@
 # couch-potator
 
+[![CI](https://github.com/fernandodev/couch-potator/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/fernandodev/couch-potator/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/couch-potator)](https://www.npmjs.com/package/couch-potator)
+[![license](https://img.shields.io/npm/l/couch-potator)](LICENSE)
+
 **A spec board that lives in your repository.**
 
 Plain-markdown cards, a read-only viewer, and OpenCode skills that take an idea
@@ -739,6 +743,9 @@ npm test          # Node's test runner over tests/*.test.ts
 npm run typecheck
 npm run check     # typecheck + tests + build
 ```
+
+CI runs the same `npm run check` on Node 20, 22 and 24 for every push to
+`main`, every pull request and on demand (`.github/workflows/ci.yml`).
 
 The bundle is one `esbuild` invocation (`scripts/build.mjs`). Tests are bundled
 with the same esbuild and executed by `node --test` (`scripts/test.mjs`), so the

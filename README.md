@@ -68,24 +68,31 @@ done.
 
 ## Install
 
-This is a local release: it is **not on the npm registry yet**. Install it from
-a checkout:
+Requires Node 20 or newer.
 
 ```sh
-git clone <this-repo> couch-potator
+npm install -g couch-potator
+```
+
+Then run `couch-potator init` inside the project you are building. To try it
+without a global install, use `npx couch-potator`:
+
+```sh
+npx couch-potator init --name "Reading List"
+```
+
+The package is on npm at
+[`couch-potator`](https://www.npmjs.com/package/couch-potator).
+
+Working on couch-potator itself? Install from a checkout instead:
+
+```sh
+git clone https://github.com/fernandodev/couch-potator.git
 cd couch-potator
 npm install
 npm run build
 npm link            # exposes the `couch-potator` command on your PATH
 ```
-
-Then run `couch-potator init` inside the project you are building. To skip the
-global link, use `node /path/to/couch-potator/dist/cli.js <command>`.
-
-Once published, `npm install -g couch-potator` and `npx couch-potator` will work
-as usual.
-
-Node 20 or newer.
 
 ## Five-minute tour
 

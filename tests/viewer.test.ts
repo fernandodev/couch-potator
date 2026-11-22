@@ -1,11 +1,19 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import { scanBoard } from "../src/board.js";
-import { buildViewer } from "../src/viewer/build.js";
+import { buildViewer, writeViewer } from "../src/viewer/build.js";
 import { buildPayload } from "../src/viewer/data.js";
+import { refreshViewer } from "../src/viewer/refresh.js";
 
 let root: string;
 
@@ -18,6 +26,22 @@ const write = (
   const dir = path.join(root, "board", column);
   mkdirSync(dir, { recursive: true });
   writeFileSync(path.join(dir, `${id}.md`), `---\n${frontmatter}\n---\n\n${body}`);
+};
+
+interface ViewerPayloadFile {
+  generated: string;
+  projects: Array<{
+    current_milestone: number | null;
+    specs: Array<{ id: string; status: string }>;
+  }>;
+}
+
+const payloadOf = (html: string): ViewerPayloadFile => {
+  const match = html.match(
+    /<script id="board-data" type="application\/json">([\s\S]*?)<\/script>/,
+  );
+  assert.notEqual(match, null);
+  return JSON.parse(match![1]!);
 };
 
 beforeEach(() => {
@@ -114,5 +138,38 @@ describe("buildViewer", () => {
     assert.equal(scripts.length, 4);
     assert.ok(result.html.includes("\\u003c/script>"));
     assert.ok(!result.html.includes("</script> world"));
+  });
+});
+
+describe("refreshViewer", () => {
+  const viewerPath = (): string =>
+    path.join(root, ".couch-potator", "viewer", "board.html");
+
+  it("does nothing when no viewer was generated", () => {
+    assert.equal(refreshViewer(root), null);
+    assert.equal(existsSync(viewerPath()), false);
+  });
+
+  it("rewrites an existing viewer after the board changes", () => {
+    writeViewer(root, scanBoard(root));
+    assert.ok(!readFileSync(viewerPath(), "utf8").includes("Fresh body."));
+
+    write("todo", "fresh", "title: Fresh\nmilestone: 2", "## Why\n\nFresh body.\n");
+    const result = refreshViewer(root);
+
+    assert.notEqual(result, null);
+    assert.ok(readFileSync(viewerPath(), "utf8").includes("Fresh body."));
+  });
+
+  it("keeps the milestone the viewer was generated with", () => {
+    writeViewer(root, scanBoard(root), { milestone: 1 });
+    const current = (): number | null | undefined =>
+      payloadOf(readFileSync(viewerPath(), "utf8")).projects[0]?.current_milestone;
+    assert.equal(current(), 1);
+
+    write("todo", "fresh", "title: Fresh\nmilestone: 1");
+    refreshViewer(root);
+
+    assert.equal(current(), 1);
   });
 });

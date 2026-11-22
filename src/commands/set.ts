@@ -6,6 +6,7 @@ import { isKind, KINDS } from "../columns.js";
 import { resolveRoot } from "../config.js";
 import { UsageError } from "../errors.js";
 import { parseMilestone, parseOrder } from "../log.js";
+import { refreshViewer } from "../viewer/refresh.js";
 
 const OPTIONS = {
   root: ROOT_OPTION,
@@ -105,6 +106,7 @@ export async function setCommand(argv: string[]): Promise<number> {
 
   card.updated = today();
   writeCard(card);
+  refreshViewer(root);
 
   console.log(
     `${green("Set")} ${cyan(card.id)} ${field} = ${shown == null ? dim("(none)") : String(shown)}`,

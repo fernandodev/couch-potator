@@ -1,4 +1,4 @@
-import { mkdirSync, watch, writeFileSync } from "node:fs";
+import { mkdirSync, watch } from "node:fs";
 import path from "node:path";
 import { cyan, dim, green, red, yellow } from "../ansi.js";
 import { flag, parseCommandArgs, text, ROOT_OPTION } from "../args.js";
@@ -6,7 +6,7 @@ import { scanBoard } from "../board.js";
 import { boardDir, briefPath, loadConfig, relativeToRoot, resolveRoot } from "../config.js";
 import { parseMilestone, plural } from "../log.js";
 import { openInBrowser } from "../open.js";
-import { buildViewer } from "../viewer/build.js";
+import { buildViewer, writeViewerResult } from "../viewer/build.js";
 
 const OPTIONS = {
   out: { type: "string" as const, short: "o" },
@@ -32,12 +32,13 @@ export async function viewCommand(argv: string[]): Promise<number> {
   const milestone = rawMilestone === undefined ? undefined : parseMilestone(rawMilestone, null);
   const outOverride = text(values, "out");
 
+  const options = milestone === undefined ? {} : { milestone };
   const build = () => {
     const board = scanBoard(root);
-    const result = buildViewer(root, board, milestone === undefined ? {} : { milestone });
+    const result = buildViewer(root, board, options);
     const outPath = outOverride ? path.resolve(root, outOverride) : result.outPath;
     mkdirSync(path.dirname(outPath), { recursive: true });
-    writeFileSync(outPath, result.html, "utf8");
+    writeViewerResult(outPath, result, options);
     return { result, outPath, cards: board.cards.length };
   };
 

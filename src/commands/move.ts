@@ -7,6 +7,7 @@ import { today, writeCard, type Card } from "../card.js";
 import { resolveColumn } from "../columns.js";
 import { boardDir, relativeToRoot, resolveRoot } from "../config.js";
 import { UsageError } from "../errors.js";
+import { refreshViewer } from "../viewer/refresh.js";
 
 const OPTIONS = {
   top: { type: "boolean" as const },
@@ -89,6 +90,7 @@ export async function moveCommand(argv: string[]): Promise<number> {
 
   if (oldFile !== newFile && existsSync(oldFile)) unlinkSync(oldFile);
 
+  refreshViewer(root);
   console.log(
     `${green("Moved")} ${cyan(card.id)} ${dim(`${source} \u2192`)} ${target} ${dim(card.relFile)}`,
   );

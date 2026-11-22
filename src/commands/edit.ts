@@ -3,6 +3,7 @@ import { parseCommandArgs, text, ROOT_OPTION } from "../args.js";
 import { resolveCard, scanBoard } from "../board.js";
 import { resolveRoot } from "../config.js";
 import { CliError, UsageError } from "../errors.js";
+import { refreshViewer } from "../viewer/refresh.js";
 
 const OPTIONS = {
   root: ROOT_OPTION,
@@ -31,5 +32,6 @@ export async function editCommand(argv: string[]): Promise<number> {
   if (result.status !== 0) {
     throw new CliError(`"${editor}" exited with status ${result.status ?? "unknown"}.`);
   }
+  refreshViewer(root);
   return 0;
 }

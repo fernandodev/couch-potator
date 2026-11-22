@@ -1,10 +1,11 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Board } from "../board.js";
 import { viewerOutPath } from "../config.js";
 import { CliError } from "../errors.js";
+import { writeFileAtomic } from "../fsutil.js";
 import { buildPayload, type PayloadOptions, type ViewerPayload } from "./data.js";
 
 const require = createRequire(import.meta.url);
@@ -119,6 +120,46 @@ export function buildViewer(
   };
 }
 
+interface ViewerOptionsFile {
+  milestone?: number | null;
+}
+
+/** Remembers the flags a viewer was generated with, so a later refresh keeps them. */
+function optionsPath(outPath: string): string {
+  return `${outPath}.options.json`;
+}
+
+export function saveViewerOptions(outPath: string, options: PayloadOptions): void {
+  const file = optionsPath(outPath);
+  if (options.milestone === undefined) {
+    rmSync(file, { force: true });
+    return;
+  }
+  writeFileAtomic(file, `${JSON.stringify({ milestone: options.milestone })}\n`);
+}
+
+export function loadViewerOptions(outPath: string): PayloadOptions {
+  const file = optionsPath(outPath);
+  if (!existsSync(file)) return {};
+  try {
+    const parsed = JSON.parse(readFileSync(file, "utf8")) as ViewerOptionsFile;
+    if (parsed.milestone === null) return { milestone: null };
+    if (typeof parsed.milestone === "number") return { milestone: parsed.milestone };
+  } catch {
+    /* a corrupt options file falls back to the brief's current milestone */
+  }
+  return {};
+}
+
+export function writeViewerResult(
+  outPath: string,
+  result: ViewerResult,
+  options: PayloadOptions,
+): void {
+  writeFileAtomic(outPath, result.html);
+  saveViewerOptions(outPath, options);
+}
+
 export function writeViewer(
   root: string,
   board: Board,
@@ -126,6 +167,6 @@ export function writeViewer(
 ): ViewerResult {
   const result = buildViewer(root, board, options);
   mkdirSync(path.dirname(result.outPath), { recursive: true });
-  writeFileSync(result.outPath, result.html, "utf8");
+  writeViewerResult(result.outPath, result, options);
   return result;
 }

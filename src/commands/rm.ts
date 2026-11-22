@@ -5,6 +5,7 @@ import { flag, parseCommandArgs, text, ROOT_OPTION } from "../args.js";
 import { resolveCard, scanBoard } from "../board.js";
 import { resolveRoot } from "../config.js";
 import { UsageError } from "../errors.js";
+import { refreshViewer } from "../viewer/refresh.js";
 
 const OPTIONS = {
   force: { type: "boolean" as const, short: "f" },
@@ -37,6 +38,7 @@ export async function rmCommand(argv: string[]): Promise<number> {
   }
 
   unlinkSync(card.file);
+  refreshViewer(root);
   console.log(`${green("Deleted")} ${cyan(card.id)} ${card.relFile}`);
   return 0;
 }

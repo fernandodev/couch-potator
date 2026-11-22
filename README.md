@@ -22,8 +22,24 @@ The folder is the status. The file name is the id. The frontmatter is the
 metadata. The body is the spec. Your editor, `git diff` and `grep` all work on
 it, and so does an agent.
 
+## See it
+
+![The board: Todo, In progress, Blocked and Done columns with cards coloured by kind](public/board.png)
+
+*`couch-potator view` — one self-contained page, here filtered to milestone 1.*
+
+A notes app planned and built with these skills, running in the iOS Simulator:
+
+[![The Notes app running in the iOS Simulator](public/recording-poster.png)](public/recording.mp4)
+
+*39-second recording of the finished app. Click the poster to play it.*
+
+The dependency graph and a card's spec, as the viewer renders them, are in
+[The viewer](#the-viewer) below.
+
 ## Contents
 
+- [See it](#see-it)
 - [Why couch-potator](#why-couch-potator)
 - [Install](#install)
 - [Five-minute tour](#five-minute-tour)
@@ -639,6 +655,15 @@ It is structurally read-only: there is no server, no `fetch`, no write endpoint
 and no drag handler. Markdown is rendered with marked and sanitised with
 DOMPurify, both inlined into the page. The page works over `file://`, so it can
 be emailed or committed as a build artifact if you really want to.
+
+![The dependency graph in the viewer: cards as nodes, with arrows pointing at the dependent spec](public/graph.png)
+
+*`Cards` / `Graph` toggles the dependency graph for the selected milestone.*
+
+![A card open in the viewer: metadata chips, surfaces and the rendered spec](public/card.png)
+
+*Clicking a card opens its rendered spec, with metadata chips, surface chips and
+the file path.*
 
 ## Dependency graph
 

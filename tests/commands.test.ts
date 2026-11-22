@@ -14,6 +14,7 @@ import { moveCommand } from "../src/commands/move.js";
 import { rmCommand } from "../src/commands/rm.js";
 import { setCommand } from "../src/commands/set.js";
 import { showCommand } from "../src/commands/show.js";
+import { skillCommand } from "../src/commands/skill.js";
 import { viewCommand } from "../src/commands/view.js";
 import { parseMarkdown } from "../src/frontmatter.js";
 import { captureOutput, type OutputCapture } from "./support.js";
@@ -198,6 +199,125 @@ describe("init", () => {
       await initCommand(["--root", other, "--no-skill"]);
       assert.equal(existsSync(path.join(other, ".opencode")), false);
       assert.equal(existsSync(path.join(other, "AGENTS.md")), false);
+    } finally {
+      rmSync(other, { recursive: true, force: true });
+    }
+  });
+
+  it("installs Claude Code skills, commands, subagents and CLAUDE.md", async () => {
+    const other = mkdtempSync(path.join(tmpdir(), "cpt-claude-"));
+    try {
+      await initCommand(["--root", other, "--name", "Demo", "--target", "claude"]);
+
+      for (const name of [
+        "couch-potator-board",
+        "couch-potator-planner",
+        "couch-potator-unblock",
+        "couch-potator-implement",
+      ]) {
+        assert.equal(
+          existsSync(path.join(other, ".claude", "skills", name, "SKILL.md")),
+          true,
+          name,
+        );
+      }
+      assert.equal(existsSync(path.join(other, ".claude", "commands", "unblock.md")), true);
+      assert.equal(existsSync(path.join(other, ".claude", "commands", "implement.md")), true);
+      assert.equal(
+        existsSync(path.join(other, ".claude", "agents", "couch-potator-implementer.md")),
+        true,
+      );
+      assert.equal(
+        existsSync(path.join(other, ".claude", "agents", "couch-potator-integrator.md")),
+        true,
+      );
+
+      assert.equal(existsSync(path.join(other, ".opencode")), false);
+      assert.equal(existsSync(path.join(other, "AGENTS.md")), false);
+      assert.match(
+        readFileSync(path.join(other, "CLAUDE.md"), "utf8"),
+        /<!-- couch-potator:start -->/,
+      );
+
+      const unblock = parseMarkdown(
+        readFileSync(
+          path.join(other, ".claude", "skills", "couch-potator-unblock", "SKILL.md"),
+          "utf8",
+        ),
+      );
+      assert.equal(unblock.data["disable-model-invocation"], true);
+      assert.equal(unblock.data.metadata, undefined);
+
+      const implementer = parseMarkdown(
+        readFileSync(
+          path.join(other, ".claude", "agents", "couch-potator-implementer.md"),
+          "utf8",
+        ),
+      );
+      assert.equal(implementer.data.name, "couch-potator-implementer");
+      assert.equal(implementer.data.mode, undefined);
+
+      const planner = readFileSync(
+        path.join(other, ".claude", "skills", "couch-potator-planner", "SKILL.md"),
+        "utf8",
+      );
+      assert.match(planner, /AskUserQuestion/);
+      assert.match(planner, /multiSelect/);
+
+      const implement = readFileSync(
+        path.join(other, ".claude", "skills", "couch-potator-implement", "SKILL.md"),
+        "utf8",
+      );
+      assert.match(implement, /Agent\(subagent_type="couch-potator-implementer"/);
+      assert.match(implement, /general-purpose/);
+      assert.match(implement, /<worktree>\/CLAUDE\.md/);
+    } finally {
+      rmSync(other, { recursive: true, force: true });
+    }
+  });
+
+  it("installs both targets side by side", async () => {
+    const other = mkdtempSync(path.join(tmpdir(), "cpt-both-"));
+    try {
+      await initCommand(["--root", other, "--target", "both"]);
+
+      assert.equal(
+        existsSync(path.join(other, ".opencode", "skills", "couch-potator-board", "SKILL.md")),
+        true,
+      );
+      assert.equal(
+        existsSync(path.join(other, ".claude", "skills", "couch-potator-board", "SKILL.md")),
+        true,
+      );
+      assert.equal(existsSync(path.join(other, "AGENTS.md")), true);
+      assert.equal(existsSync(path.join(other, "CLAUDE.md")), true);
+    } finally {
+      rmSync(other, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects an unknown target", async () => {
+    const other = mkdtempSync(path.join(tmpdir(), "cpt-badtarget-"));
+    try {
+      await assert.rejects(
+        () => initCommand(["--root", other, "--target", "vscode"]),
+        /Unknown target "vscode"/,
+      );
+    } finally {
+      rmSync(other, { recursive: true, force: true });
+    }
+  });
+
+  it("lets skill install pick the Claude Code target", async () => {
+    const other = mkdtempSync(path.join(tmpdir(), "cpt-skilltarget-"));
+    try {
+      await initCommand(["--root", other, "--no-skill"]);
+      await skillCommand(["--root", other, "--target", "claude"]);
+      assert.equal(
+        existsSync(path.join(other, ".claude", "skills", "couch-potator-board", "SKILL.md")),
+        true,
+      );
+      assert.equal(existsSync(path.join(other, ".opencode")), false);
     } finally {
       rmSync(other, { recursive: true, force: true });
     }

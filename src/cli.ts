@@ -65,7 +65,7 @@ function help(): void {
   console.log("");
   console.log(bold("Commands"));
   const rows: Array<[string, string]> = [
-    ["init", "Create board/, PROJECT.md, config and agent scaffolding"],
+    ["init", "Create board/, PROJECT.md, config and agent scaffolding (--target)"],
     ["add", "Create a card (-k kind, -m milestone, -p priority, -s surface)"],
     ["list", "List cards (-c column, -m milestone, --json, --ids)"],
     ["show", "Print a spec (--raw, --path, --json)"],
@@ -81,7 +81,7 @@ function help(): void {
     ["next", "Pick the next ready cards: --parallel N, --json"],
     ["graph", "Dependency graph: --format text|mermaid|dot"],
     ["view", "Build and open the read-only viewer (--watch, --no-open)"],
-    ["skill", "Install the board, planner and unblock skills, /unblock, and AGENTS.md"],
+    ["skill", "Install agent skills, commands and subagents (--target opencode|claude|both)"],
     ["completion", "Print or install shell completions (bash|zsh|fish)"],
   ];
   for (const [name, description] of rows) {
@@ -94,7 +94,7 @@ function help(): void {
   console.log(`  ${cyan("--version")}      Version`);
   console.log("");
   console.log(bold("Examples"));
-  console.log(dim('  couch-potator init'));
+  console.log(dim('  couch-potator init --target claude'));
   console.log(dim('  couch-potator add "Reduce cold start" -k feature -m 1'));
   console.log(dim("  couch-potator move reduce-cold-start in-progress"));
   console.log(dim("  couch-potator view"));

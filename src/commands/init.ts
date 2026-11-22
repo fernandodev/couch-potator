@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
-import { installAgentFiles } from "../agent.js";
+import { installAgentFiles, parseInstallTarget } from "../agent.js";
 import { cyan, dim, green, yellow } from "../ansi.js";
 import { flag, parseCommandArgs, text, ROOT_OPTION } from "../args.js";
 import { COLUMNS } from "../columns.js";
@@ -20,6 +20,7 @@ import { CARD_TEMPLATE, projectTemplate } from "../templates.js";
 
 const OPTIONS = {
   name: { type: "string" as const },
+  target: { type: "string" as const },
   "no-skill": { type: "boolean" as const },
   force: { type: "boolean" as const },
   root: ROOT_OPTION,
@@ -73,7 +74,10 @@ export async function initCommand(argv: string[]): Promise<number> {
   );
 
   if (!flag(values, "no-skill")) {
-    const result = installAgentFiles(root, { force: flag(values, "force") });
+    const result = installAgentFiles(root, {
+      force: flag(values, "force"),
+      target: parseInstallTarget(text(values, "target")),
+    });
     created.push(...result.written);
     existing.push(...result.skipped);
     removed.push(...result.removed);

@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { INSTALL_TARGETS } from "./agent.js";
 import { milestonesOf, scanBoard } from "./board.js";
 import { COLUMNS, KINDS } from "./columns.js";
 import { CHECK_PHASES, findRoot } from "./config.js";
@@ -73,7 +74,16 @@ export const SET_FIELDS = [
 
 export const GRAPH_FORMATS = ["text", "mermaid", "dot"] as const;
 
-type ValueSource = "column" | "kind" | "format" | "field" | "shell" | "card" | "milestone" | "command";
+type ValueSource =
+  | "column"
+  | "kind"
+  | "format"
+  | "field"
+  | "shell"
+  | "card"
+  | "milestone"
+  | "command"
+  | "target";
 
 interface FlagSpec {
   takesValue: boolean;
@@ -86,6 +96,7 @@ const KIND_VALUES: string[] = [...KINDS];
 const FLAGS: Record<string, Record<string, FlagSpec>> = {
   init: {
     "--name": { takesValue: true },
+    "--target": { takesValue: true, source: "target" },
     "--no-skill": { takesValue: false },
     "--force": { takesValue: false },
   },
@@ -176,6 +187,7 @@ const FLAGS: Record<string, Record<string, FlagSpec>> = {
   skill: {
     "-f": { takesValue: false },
     "--force": { takesValue: false },
+    "--target": { takesValue: true, source: "target" },
   },
   completion: {
     "--no-rc": { takesValue: false },
@@ -232,6 +244,8 @@ function sourceValues(source: ValueSource, root?: string | null): string[] {
       return [...SET_FIELDS];
     case "shell":
       return [...SHELLS];
+    case "target":
+      return [...INSTALL_TARGETS];
     case "command":
       return [...COMMANDS];
     case "card":

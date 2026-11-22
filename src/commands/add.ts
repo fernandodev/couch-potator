@@ -10,6 +10,7 @@ import { UsageError } from "../errors.js";
 import { parseMilestone, parseOrder, warn } from "../log.js";
 import { slugify, uniqueId } from "../slug.js";
 import { CARD_TEMPLATE } from "../templates.js";
+import { refreshViewer } from "../viewer/refresh.js";
 
 const OPTIONS = {
   column: { type: "string" as const, short: "c" },
@@ -99,6 +100,7 @@ export async function addCommand(argv: string[]): Promise<number> {
   };
 
   writeCard(card);
+  refreshViewer(root);
 
   if (flag(values, "json")) {
     console.log(JSON.stringify(cardJson(card), null, 2));

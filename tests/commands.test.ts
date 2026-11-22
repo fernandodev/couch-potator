@@ -488,4 +488,24 @@ describe("view", () => {
     assert.ok(!html.includes("/api/state"));
     assert.ok(html.includes("read only"));
   });
+
+  it("refreshes an existing viewer after a card change", async () => {
+    await addCommand(["--root", root, "Visible card", "-m", "1"]);
+    await viewCommand(["--root", root, "--no-open"]);
+
+    const file = path.join(root, ".couch-potator", "viewer", "board.html");
+    await addCommand(["--root", root, "Later card", "-m", "1"]);
+    await moveCommand(["--root", root, "later-card", "in-progress"]);
+
+    const html = readFileSync(file, "utf8");
+    const match = html.match(
+      /<script id="board-data" type="application\/json">([\s\S]*?)<\/script>/,
+    );
+    assert.notEqual(match, null);
+    const data = JSON.parse(match![1]!);
+    const later = data.projects[0].specs.find(
+      (spec: { id: string }) => spec.id === "later-card",
+    );
+    assert.equal(later.status, "in-progress");
+  });
 });

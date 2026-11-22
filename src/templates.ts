@@ -240,9 +240,14 @@ a left-to-right dependency graph with pan, zoom and hover highlighting.
 
 Run it in the foreground; it exits immediately after writing the file.
 
+Once the viewer exists, every CLI command that changes a card rewrites it, so
+the page's \`Reload\` button shows the current board without running
+\`${command} view\` again.
+
 \`${command} view --watch\` keeps running and rebuilds the file when anything under
-\`${boardPath}/\` or \`${briefPath}\` changes. The browser does not reload itself —
-press the page's \`Reload\` button or refresh the tab.
+\`${boardPath}/\` or \`${briefPath}\` changes, including edits made outside the CLI.
+The browser does not reload itself — press the page's \`Reload\` button or refresh
+the tab.
 
 \`\`\`text
 Board viewer: /path/to/project/.couch-potator/viewer/board.html

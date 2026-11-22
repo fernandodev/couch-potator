@@ -622,13 +622,18 @@ reuses them.
   `depends_on` / `related` links, `surfaces` chips and the file path
 - `Brief` opens `PROJECT.md`
 - `Cards` / `Graph` toggle
-- `Reload` re-reads the file after you regenerate it
+- `Reload` re-reads the latest page; card commands rewrite the file automatically
 
 ```sh
 couch-potator view                  # write and open
 couch-potator view --no-open        # write only
-couch-potator view --watch          # rebuild on board changes, then Reload
+couch-potator view --watch          # rebuild on any board change, then Reload
 ```
+
+Once a viewer exists, every command that changes a card rewrites it in place, so
+the open page shows the current board after `Reload` without running `view`
+again. `--watch` also catches edits made outside the CLI, such as a hand-edited
+card or brief.
 
 It is structurally read-only: there is no server, no `fetch`, no write endpoint
 and no drag handler. Markdown is rendered with marked and sanitised with

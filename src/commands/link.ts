@@ -6,6 +6,7 @@ import { resolveRoot } from "../config.js";
 import { CliError, UsageError } from "../errors.js";
 import { warn } from "../log.js";
 import { findCycles } from "../validate.js";
+import { refreshViewer } from "../viewer/refresh.js";
 
 const OPTIONS = {
   root: ROOT_OPTION,
@@ -57,6 +58,7 @@ export async function linkCommand(argv: string[], field: LinkField): Promise<num
 
       card.updated = today();
       writeCard(card);
+      refreshViewer(root);
       console.log(`${green("Linked")} ${cyan(card.id)} ${dim("\u2192")} ${other.id}`);
       return 0;
     }
@@ -69,6 +71,7 @@ export async function linkCommand(argv: string[], field: LinkField): Promise<num
     links.splice(at, 1);
     card.updated = today();
     writeCard(card);
+    refreshViewer(root);
     console.log(`${green("Unlinked")} ${cyan(card.id)} ${dim("\u2192")} ${other.id}`);
     return 0;
   }

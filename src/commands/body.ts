@@ -6,6 +6,7 @@ import { resolveCard, scanBoard } from "../board.js";
 import { today, writeCard } from "../card.js";
 import { resolveRoot } from "../config.js";
 import { UsageError } from "../errors.js";
+import { refreshViewer } from "../viewer/refresh.js";
 
 const OPTIONS = {
   file: { type: "string" as const, short: "f" },
@@ -29,6 +30,7 @@ export async function bodyCommand(argv: string[]): Promise<number> {
   card.body = source === "-" ? readFileSync(0, "utf8") : readFileSync(path.resolve(source), "utf8");
   card.updated = today();
   writeCard(card);
+  refreshViewer(root);
 
   console.log(`${green("Updated body")} ${cyan(card.id)} ${dim(card.relFile)}`);
   return 0;

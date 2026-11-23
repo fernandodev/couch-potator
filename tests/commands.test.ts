@@ -161,6 +161,10 @@ describe("init", () => {
     assert.match(skill.body, /spec\/<card-id>/);
     assert.match(skill.body, /STATUS: DONE/);
     assert.match(skill.body, /### 3d\. Work and witness/);
+    assert.match(skill.body, /### 3e\. Safety/);
+    assert.match(skill.body, /pkill/);
+    assert.match(skill.body, /frontmost/);
+    assert.match(skill.body, /\$TMPDIR/);
     assert.match(skill.body, /preview\//);
     assert.match(skill.body, /concurrency/);
 
@@ -177,6 +181,10 @@ describe("init", () => {
     assert.match(implementer.body, /STATUS: BLOCKED/);
     assert.match(implementer.body, /pending witness/);
     assert.match(implementer.body, /One commit/);
+    assert.match(implementer.body, /## Safety/);
+    assert.match(implementer.body, /pkill/);
+    assert.match(implementer.body, /frontmost/);
+    assert.match(implementer.body, /\$TMPDIR/);
 
     const integrator = parseMarkdown(
       readFileSync(path.join(root, ".opencode", "agents", "couch-potator-integrator.md"), "utf8"),

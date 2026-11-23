@@ -44,6 +44,10 @@ const files = readdirSync(outdir)
 const result = spawnSync(process.execPath, ["--test", ...files], {
   cwd: root,
   stdio: "inherit",
+  // The suite compares plain text, but commands colourise their output when
+  // stdout is a TTY. Running `npm test` from a terminal used to paint the
+  // captured output and fail assertions, so pin the runner to no colour.
+  env: { ...process.env, NO_COLOR: "1" },
 });
 
 rmSync(outdir, { recursive: true, force: true });

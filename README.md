@@ -310,6 +310,7 @@ priority: must           # must | should | could
 order: 20                # position inside a column
 depends_on: [reading-list-page]
 related: [book-details]
+environments: [browser]    # runtime needed to check it
 surfaces: [add-form]      # what the owner can point at
 blocked_reason:
 completed:
@@ -459,20 +460,25 @@ How a run works:
 3. Each card moves to `in-progress/` and gets a branch `spec/<card-id>` and a
    worktree at `.couch-potator/worktrees/spec-<card-id>`.
 4. One worker per card implements **one** card, runs the fast checks and returns
-   a `STATUS: DONE` or `STATUS: BLOCKED` report.
-5. The orchestrator reviews the diff, runs the fast checks, checks every
-   acceptance criterion and rebases onto the current base. A conflicted rebase
-   goes to the `couch-potator-integrator` subagent, which may only make
-   *mechanical* adaptations; a product conflict blocks the card.
+   a `STATUS: DONE` or `STATUS: BLOCKED` report. A worker starts a runtime only
+   when the orchestrator assigned it an environment slot.
+5. The orchestrator reviews the diff, runs the fast checks, witnesses every
+   acceptance criterion and rebases onto the current base. Witnessing starts as
+   soon as a branch is ready, while the rest of the batch is still being built;
+   when several cards share a single-instance environment, their checks collapse
+   into one preview build and one launch. A conflicted rebase goes to the
+   `couch-potator-integrator` subagent, which may only make *mechanical*
+   adaptations; a product conflict blocks the card.
 6. The card is squash-merged as one commit, moved to `done/` with a
    `## Verification` section, and the worktree and branch are removed.
 7. Blocked cards go to `blocked/` with a `## Decision needed` section; the
    branch is kept so the work survives.
 
 It never pushes, never forces, never merges two branches at once, and never
-marks a card done without verification. Only a single-worker run may launch the
-app for visual checks; with more workers, the orchestrator does it after the
-batch returns.
+marks a card done without verification. `--parallel` bounds how many cards are
+**built** at once; `concurrency` in `config.json` bounds how many runtimes are
+**checked** at once. A single-instance product still builds cards in parallel and
+queues their checks; see [Environments](#environments).
 
 If the project root is not a git repository yet, the skill initializes one
 automatically — but it stops and asks if the staged files look like secrets or

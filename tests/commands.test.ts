@@ -78,11 +78,15 @@ describe("init", () => {
     assert.ok(
       readFileSync(path.join(root, ".gitignore"), "utf8").includes(".couch-potator/worktrees/"),
     );
+    assert.ok(
+      readFileSync(path.join(root, ".gitignore"), "utf8").includes(".couch-potator/evidence/"),
+    );
 
     const brief = parseMarkdown(readFileSync(path.join(root, "PROJECT.md"), "utf8"));
     assert.equal(brief.data.name, "Demo");
     assert.equal(brief.data.current_milestone, 1);
     assert.ok(brief.body.includes("## Vision"));
+    assert.ok(brief.body.includes("## Run and verify"));
     assert.ok(brief.body.includes("## Working state"));
     assert.ok(brief.body.includes("## Ideas / later"));
   });
@@ -113,6 +117,8 @@ describe("init", () => {
     assert.match(planner, /couch-potator add/);
     assert.match(planner, /couch-potator body/);
     assert.match(planner, /couch-potator check/);
+    assert.match(planner, /environments/);
+    assert.match(planner, /Run and verify/);
   });
 
   it("hides the unblock skill and points /unblock at it", () => {
@@ -154,6 +160,9 @@ describe("init", () => {
     assert.match(skill.body, /couch-potator checks/);
     assert.match(skill.body, /spec\/<card-id>/);
     assert.match(skill.body, /STATUS: DONE/);
+    assert.match(skill.body, /### 3d\. Work and witness/);
+    assert.match(skill.body, /preview\//);
+    assert.match(skill.body, /concurrency/);
 
     const command = readFileSync(path.join(root, ".opencode", "commands", "implement.md"), "utf8");
     assert.match(command, /\$ARGUMENTS/);
@@ -166,6 +175,7 @@ describe("init", () => {
     assert.equal(implementer.data.mode, "subagent");
     assert.match(implementer.body, /STATUS: DONE/);
     assert.match(implementer.body, /STATUS: BLOCKED/);
+    assert.match(implementer.body, /pending witness/);
     assert.match(implementer.body, /One commit/);
 
     const integrator = parseMarkdown(

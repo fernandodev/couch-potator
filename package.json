@@ -1,6 +1,6 @@
 {
   "name": "couch-potator",
-  "version": "0.6.2",
+  "version": "0.7.0",
   "description": "A folder-backed spec board with planner and unblock skills, read-only browser viewer, dependency graph, and milestones.",
   "keywords": [
     "board",

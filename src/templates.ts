@@ -1,8 +1,53 @@
+export type AgentTarget = "opencode" | "claude";
+
 export interface TemplateContext {
   command: string;
   boardPath: string;
   briefPath: string;
   projectName: string;
+  target: AgentTarget;
+  instructionsFile: string;
+  questionTool: string;
+  multiSelectField: string;
+}
+
+function frontmatter(lines: string[]): string {
+  return `---\n${lines.join("\n")}\n---\n\n`;
+}
+
+function skillFrontmatter(
+  target: AgentTarget,
+  fields: { name: string; description: string; hidden?: boolean },
+): string {
+  const lines = [`name: ${fields.name}`, `description: ${fields.description}`];
+  if (fields.hidden) {
+    lines.push(
+      ...(target === "claude"
+        ? ["disable-model-invocation: true"]
+        : ["metadata:", "  opencode/autoinvoke: false"]),
+    );
+  }
+  return frontmatter(lines);
+}
+
+function commandFrontmatter(
+  target: AgentTarget,
+  fields: { description: string; hidden?: boolean },
+): string {
+  const lines = [`description: ${fields.description}`];
+  if (fields.hidden && target === "claude") lines.push("disable-model-invocation: true");
+  return frontmatter(lines);
+}
+
+function agentFrontmatter(
+  target: AgentTarget,
+  fields: { name: string; description: string },
+): string {
+  return frontmatter(
+    target === "claude"
+      ? [`name: ${fields.name}`, `description: ${fields.description}`]
+      : [`description: ${fields.description}`, "mode: subagent"],
+  );
 }
 
 export const CARD_TEMPLATE = `## Summary
@@ -159,13 +204,11 @@ ${AGENTS_END}`;
 }
 
 export function skillTemplate(context: TemplateContext): string {
-  const { command, boardPath, briefPath } = context;
-  return `---
-name: couch-potator-board
-description: Read or update this project's couch-potator spec board (${boardPath}/todo, in-progress, blocked, done) and open a read-only browser view with cards, rendered specs, milestones and a dependency graph. Use when the owner wants to see, add, move, or read a card or spec.
----
-
-# Couch Potator Board
+  const { command, boardPath, briefPath, target } = context;
+  return `${skillFrontmatter(target, {
+    name: "couch-potator-board",
+    description: `Read or update this project's couch-potator spec board (${boardPath}/todo, in-progress, blocked, done) and open a read-only browser view with cards, rendered specs, milestones and a dependency graph. Use when the owner wants to see, add, move, or read a card or spec.`,
+  })}# Couch Potator Board
 
 The board is a plain folder tree at \`${boardPath}/\`:
 
@@ -287,13 +330,12 @@ Take the path from the \`VIEWER_FILE=\` line and tell the owner that line plus
 }
 
 export function plannerSkillTemplate(context: TemplateContext): string {
-  const { command, boardPath, briefPath } = context;
-  return `---
-name: couch-potator-planner
-description: Turn a product idea into a couch-potator board of plain-language specs that an implementation agent can build without guessing. Use when the owner wants to plan a product, define or refine a milestone, brainstorm features, write specs, unblock cards, or review progress. The planner discusses what and why, never implementation details, and writes cards to the board as the conversation happens.
----
-
-# Couch Potator Planner
+  const { command, boardPath, briefPath, target } = context;
+  return `${skillFrontmatter(target, {
+    name: "couch-potator-planner",
+    description:
+      "Turn a product idea into a couch-potator board of plain-language specs that an implementation agent can build without guessing. Use when the owner wants to plan a product, define or refine a milestone, brainstorm features, write specs, unblock cards, or review progress. The planner discusses what and why, never implementation details, and writes cards to the board as the conversation happens.",
+  })}# Couch Potator Planner
 
 You are the **planner**. You do not build. You turn a product idea into a board of
 plain-language specs that a separate implementer can build without guessing.
@@ -316,7 +358,7 @@ Every planning session runs this loop:
 4. **Brainstorm** — if the owner gives too little information, co-design: propose
    concrete ideas, flows and trade-offs, then ask targeted questions.
 5. **Define or refine the milestone** — the smallest version that is genuinely useful.
-6. **Check agreement** — ask the owner, through the \`question\` tool: "Is this
+6. **Check agreement** — ask the owner, through the \`${context.questionTool}\` tool: "Is this
    milestone enough?"
    - If yes, stop. The board is ready for an implementer.
    - If no, loop again: refine scope, add or remove cards, re-ask.
@@ -543,14 +585,14 @@ define the current milestone without guessing.
 
 ### Ask with the question tool
 
-Every question to the owner must go through the \`question\` tool so the owner can pick
-an option or tick a checkbox. Never print questions as plain chat text.
+Every question to the owner must go through the \`${context.questionTool}\` tool so the
+owner can pick an option or tick a checkbox. Never print questions as plain chat text.
 
-- Batch 3–5 related questions in one \`question\` call.
+- Batch 3–5 related questions in one \`${context.questionTool}\` call.
 - Give each question 2–4 concrete options, each with a short label and a one-line
   description.
 - Put your recommended option first and append "(Recommended)" to its label.
-- Use \`multiple: true\` when several options can apply.
+- Use \`${context.multiSelectField}: true\` when several options can apply.
 - Say why the answer matters.
 - The tool adds "Type your own answer" automatically; do not add a free-form option.
 
@@ -792,7 +834,7 @@ Next ready:
 
 4. If the project is mid-discovery, add \`(discovery)\` to the project line and say
    which cards are being written.
-5. Ask, through the \`question\` tool, whether the owner wants to **plan**, **unblock**
+5. Ask, through the \`${context.questionTool}\` tool, whether the owner wants to **plan**, **unblock**
    or **review**. If the owner picks **unblock**, load the
    \`couch-potator-unblock\` skill by id and follow it.
 
@@ -819,7 +861,7 @@ session; this section only tells you when to switch to it.
 
 - Summarise what is done and what is in progress.
 - Check the \`## Verification\` notes and acceptance criteria.
-- Ask the owner to try the milestone through the \`question\` tool.
+- Ask the owner to try the milestone through the \`${context.questionTool}\` tool.
 - Turn feedback into new cards or brief updates.
 - Do not accept \`done\` without convincing evidence.
 
@@ -883,13 +925,13 @@ The board is ready for an implementer when:
 - At least one card in \`todo\` meets the Definition of Ready.
 - Dependencies are acyclic and point to existing cards in this project.
 - No card in \`todo\` has an open question.
-- The owner has agreed the milestone's scope through the \`question\` tool.
+- The owner has agreed the milestone's scope through the \`${context.questionTool}\` tool.
 
 The implementer reads the brief and the board, works in dependency order, updates the
-board directly, verifies every criterion, and stops at the milestone boundary. In
-OpenCode, \`/implement\` runs the \`couch-potator-implement\` skill, which does this with
-one fresh worker per card and a worktree per worker. The planner does not start the
-next milestone.
+board directly, verifies every criterion, and stops at the milestone boundary. Running
+\`/implement\` loads the \`couch-potator-implement\` skill, which does this with one fresh
+worker per card and a worktree per worker. The planner does not start the next
+milestone.
 
 ## Anti-patterns
 
@@ -919,7 +961,7 @@ The owner says: "I want a simple board where I can move cards around."
 
 1. Write the sentence into **Vision** and set **Working state** to "discovery
    started".
-2. Ask the first batch through the \`question\` tool: phone or computer? just you or
+2. Ask the first batch through the \`${context.questionTool}\` tool: phone or computer? just you or
    other people? does it need sign-in? what should the first useful version include?
 3. Write the answers into the brief. Create \`create-a-board\` in \`todo\` with a user
    story and criteria. Create \`add-lists\` and \`add-cards\` as \`blocked\` stubs if a
@@ -939,15 +981,13 @@ detail. Leave it out.
 }
 
 export function unblockSkillTemplate(context: TemplateContext): string {
-  const { command, boardPath, briefPath } = context;
-  return `---
-name: couch-potator-unblock
-description: Re-discuss a blocked couch-potator spec by explaining why it is blocked, asking the owner the open questions, recording the answers, and moving ready specs back to todo. Use only when the owner explicitly asks to unblock a card or runs /unblock.
-metadata:
-  opencode/autoinvoke: false
----
-
-# Couch Potator Unblock
+  const { command, boardPath, briefPath, target } = context;
+  return `${skillFrontmatter(target, {
+    name: "couch-potator-unblock",
+    description:
+      "Re-discuss a blocked couch-potator spec by explaining why it is blocked, asking the owner the open questions, recording the answers, and moving ready specs back to todo. Use only when the owner explicitly asks to unblock a card or runs /unblock.",
+    hidden: true,
+  })}# Couch Potator Unblock
 
 You are the **planner** in unblock mode. You do not build. You turn a blocked
 spec back into a ready one by getting the missing owner answers and rewriting
@@ -967,7 +1007,7 @@ The argument is the text after \`/unblock\`, or whatever the owner names in the
 request. It is one of:
 
 - **Blank** — list every card in \`${boardPath}/blocked/\` and ask which one to
-  unblock, through the \`question\` tool. Never guess.
+  unblock, through the \`${context.questionTool}\` tool. Never guess.
 - **\`all\`** — unblock every blocked card in id order. An optional \`-m <n>\` or
   \`milestone <n>\` limits the run to one milestone. Report the list before
   starting, then begin with the lowest id.
@@ -1016,7 +1056,7 @@ the answer.
 
 ### 2b. Ask the owner
 
-Ask the open questions in small batches through the \`question\` tool:
+Ask the open questions in small batches through the \`${context.questionTool}\` tool:
 
 - 3–5 related questions per call; one question is fine when the card has one.
 - Give each question 2–4 concrete options with a short label and a one-line
@@ -1114,7 +1154,7 @@ After each card, whether it moved or not:
   question.
 - Summarise briefly what changed and which specs were affected.
 
-In \`all\` mode, ask through the \`question\` tool whether to continue with the next
+In \`all\` mode, ask through the \`${context.questionTool}\` tool whether to continue with the next
 blocked card. Never start the next card while this card has an unanswered batch.
 If the owner stops or wants to wait, write what you have first.
 
@@ -1142,12 +1182,11 @@ If the owner stops or wants to wait, write what you have first.
 }
 
 export function unblockCommandTemplate(context: TemplateContext): string {
-  const { command } = context;
-  return `---
-description: Re-discuss a blocked spec, record the answers and move it back to todo
----
-
-Load the \`couch-potator-unblock\` skill and follow it exactly. Do not build
+  const { command, target } = context;
+  return `${commandFrontmatter(target, {
+    description: "Re-discuss a blocked spec, record the answers and move it back to todo",
+    hidden: true,
+  })}Load the \`couch-potator-unblock\` skill and follow it exactly. Do not build
 anything; this is a planning session.
 
 Use \`${command}\` for every card change. Read the block reason and the
@@ -1159,15 +1198,12 @@ $ARGUMENTS
 }
 
 export function implementSkillTemplate(context: TemplateContext): string {
-  const { command, boardPath, briefPath } = context;
-  return `---
-name: couch-potator-implement
-description: Build the current milestone from this project's couch-potator board. Use only when the owner explicitly asks to implement, build, or work the board, or runs /implement. Reads ready cards with \`${command} next\`, runs fresh implementer subagents in isolated worktrees, verifies acceptance criteria, and merges each card into the base branch one at a time with a verification note.
-metadata:
-  opencode/autoinvoke: false
----
-
-# Couch Potator Implement
+  const { command, boardPath, briefPath, target } = context;
+  return `${skillFrontmatter(target, {
+    name: "couch-potator-implement",
+    description: `Build the current milestone from this project's couch-potator board. Use only when the owner explicitly asks to implement, build, or work the board, or runs /implement. Reads ready cards with \`${command} next\`, runs fresh implementer subagents in isolated worktrees, verifies acceptance criteria, and merges each card into the base branch one at a time with a verification note.`,
+    hidden: true,
+  })}# Couch Potator Implement
 
 You are the **implementer** for this project. You orchestrate. You do **not** write the
 product's source code yourself — a fresh \`couch-potator-implementer\` subagent does that,
@@ -1196,7 +1232,8 @@ owns only the code inside its worktree.
 - No remote, no push, no force, no \`git reset --hard\`, no \`git clean\`. The single
   exception is restoring a card branch to its recorded pre-rebase SHA when a failed
   rebase left it dirty (see §4c).
-- Never overwrite an existing app folder, \`AGENTS.md\`, \`README.md\`, or git repository.
+- Never overwrite an existing app folder, \`${context.instructionsFile}\`, \`README.md\`, or git
+  repository.
 - Never commit secrets, \`.env\` files, keys, \`node_modules\`, or build output.
 - One fresh worker per card, always. Never reuse a worker session, even for a retry.
 - One commit per card branch, so a rebase can conflict at most once.
@@ -1288,7 +1325,7 @@ The \`fast\` group (install, test, lint, typecheck, and any extra row) runs on e
 branch, after every rebase and after every merge. The \`full\` group (build, package, and
 any extra row) runs once on the base branch when the milestone is complete.
 
-If both groups are empty, ask the owner once through the \`question\` tool, in two small
+If both groups are empty, ask the owner once through the \`${context.questionTool}\` tool, in two small
 batches: first the fast commands, then the full commands. For each step offer concrete
 options and a recommendation, and let the owner type a command. Store every answer:
 
@@ -1409,7 +1446,7 @@ second place; the board is the single source.
 Read once per card:
 
 - the card from the board;
-- \`<worktree>/AGENTS.md\`;
+- \`<worktree>/${context.instructionsFile}\`;
 - \`<worktree>/README.md\`;
 - \`<worktree>/${briefPath}\`;
 - the already-done cards for this milestone (\`${command} list -c done -m <n>\`).
@@ -1418,11 +1455,11 @@ Spawn one fresh \`couch-potator-implementer\` subagent per card, in a single tur
 batch runs at the same time:
 
 \`\`\`text
-subagent(agent="couch-potator-implementer", description="Implement <card-id>", prompt=<worker brief>)
+${context.target === "claude" ? 'Agent(subagent_type="couch-potator-implementer", description="Implement <card-id>", prompt=<worker brief>)' : 'subagent(agent="couch-potator-implementer", description="Implement <card-id>", prompt=<worker brief>)'}
 \`\`\`
 
-If the agent is not installed, use \`general\` with the same brief and say so in the
-report. Never reuse a worker for a second card.
+If the agent is not installed, use \`${context.target === "claude" ? "general-purpose" : "general"}\`
+with the same brief and say so in the report. Never reuse a worker for a second card.
 
 The worker brief must contain:
 
@@ -1435,7 +1472,7 @@ The worker brief must contain:
 - the fast-check commands;
 - the visual-check rule below;
 - \`Return the STATUS block from your instructions exactly. Do not edit the board,
-  AGENTS.md, README.md or ${briefPath}.\`
+  ${context.instructionsFile}, README.md or ${briefPath}.\`
 
 ### 3d. Running the app and visual checks
 
@@ -1453,7 +1490,7 @@ does apply.
   returned, you run the app once in the worktree and verify the criteria before merging.
 
 Never let a worker claim visual evidence it could not have gathered. If neither you nor
-the worker can check a criterion, ask the owner through the \`question\` tool before
+the worker can check a criterion, ask the owner through the \`${context.questionTool}\` tool before
 merging.
 
 ## 4. Collect and integrate
@@ -1506,7 +1543,7 @@ If the result is \`STATUS: BLOCKED\`, go to §4e.
    \`\`\`
 
    Reject scope creep, secrets, generated build output, and edits to the board, the
-   brief, \`AGENTS.md\` or \`README.md\`. The worker was told not to touch them. If the
+   brief, \`${context.instructionsFile}\` or \`README.md\`. The worker was told not to touch them. If the
    branch does, stop and report; do not merge it and do not silently revert the worker's
    work.
 
@@ -1543,7 +1580,7 @@ git -C <worktree> rebase --abort
 
 Spawn \`couch-potator-integrator\` on this branch only. Fill its brief with the project
 name, worktree, branch, this card's id, title and full body, the colliding card's id and
-full body, the full text of \`<worktree>/AGENTS.md\`, the fast-check commands, and the
+full body, the full text of \`<worktree>/${context.instructionsFile}\`, the fast-check commands, and the
 exact rebase error output.
 
 It returns one of two verdicts. A malformed or missing verdict is treated as a product
@@ -1570,7 +1607,7 @@ Never reset the base branch, and never use it for anything else.
 ### 4d. Merge
 
 1. Update \`README.md\` in the worktree if how to run or use the app changed. Do not
-   rewrite the managed board block in \`AGENTS.md\`; that belongs to \`${command}\`.
+   rewrite the managed board block in \`${context.instructionsFile}\`; that belongs to \`${command}\`.
 2. Fold the docs change into the branch's single commit if they changed:
 
    \`\`\`sh
@@ -1775,12 +1812,11 @@ At the start of every run:
 }
 
 export function implementCommandTemplate(context: TemplateContext): string {
-  const { command } = context;
-  return `---
-description: Build the current milestone from the board with fresh implementer subagents
----
-
-Load the \`couch-potator-implement\` skill and follow it exactly. This is an
+  const { command, target } = context;
+  return `${commandFrontmatter(target, {
+    description: "Build the current milestone from the board with fresh implementer subagents",
+    hidden: true,
+  })}Load the \`couch-potator-implement\` skill and follow it exactly. This is an
 implementation session: the skill orchestrates, and a fresh subagent writes the code
 for each card.
 
@@ -1795,13 +1831,11 @@ $ARGUMENTS
 }
 
 export function implementerAgentTemplate(context: TemplateContext): string {
-  const { command, boardPath, briefPath } = context;
-  return `---
-description: Implements one couch-potator spec card in an isolated worktree
-mode: subagent
----
-
-You are a **couch-potator implementation worker**. You build exactly one card, in the
+  const { command, boardPath, briefPath, target } = context;
+  return `${agentFrontmatter(target, {
+    name: "couch-potator-implementer",
+    description: "Implements one couch-potator spec card in an isolated worktree",
+  })}You are a **couch-potator implementation worker**. You build exactly one card, in the
 worktree and branch the orchestrator gave you. You have no memory of previous cards.
 Everything you need is in the prompt and in your worktree.
 
@@ -1813,7 +1847,7 @@ main project folder.
 
 ## Read first
 
-1. \`<worktree>/AGENTS.md\`
+1. \`<worktree>/${context.instructionsFile}\`
 2. \`<worktree>/${boardPath}/in-progress/<card-id>.md\`
 3. \`<worktree>/${briefPath}\` — Vision, Audience, Non-goals, Constraints, Stack
    decisions, Design direction, Glossary and the current milestone
@@ -1825,7 +1859,7 @@ prompt. Read the files anyway; the worktree is the source.
 ## What to do
 
 - Implement exactly the card. No extra features, no speculative refactors.
-- Follow KISS and SOLID, and the layering \`AGENTS.md\` names for this stack. Do not
+- Follow KISS and SOLID, and the layering \`${context.instructionsFile}\` names for this stack. Do not
   impose an architecture it does not name.
 - Read the existing code before changing it. Match its conventions.
 - Run the fast checks in the order the orchestrator gives you, with the worktree as the
@@ -1835,7 +1869,8 @@ prompt. Read the files anyway; the worktree is the source.
   \`not verified by me — orchestrator to check\`.
 - Record internal, reversible decisions in the commit message or in the \`NOTES\` line of
   your result. Do not create a second decision log.
-- Do **not** edit the board, the card, \`${briefPath}\`, \`AGENTS.md\` or \`README.md\`.
+- Do **not** edit the board, the card, \`${briefPath}\`, \`${context.instructionsFile}\` or
+  \`README.md\`.
   The orchestrator owns them and updates them after the merge.
 - Do not create new cards.
 - Do not commit secrets, \`.env\` files, keys, \`node_modules\`, or build output.
@@ -1920,13 +1955,12 @@ block. If you are done, verify every acceptance criterion first.
 }
 
 export function integratorAgentTemplate(context: TemplateContext): string {
-  const { boardPath, briefPath } = context;
-  return `---
-description: Classifies a couch-potator rebase collision as mechanical or product, and resolves only mechanical ones
-mode: subagent
----
-
-# Rebase triage
+  const { boardPath, briefPath, target } = context;
+  return `${agentFrontmatter(target, {
+    name: "couch-potator-integrator",
+    description:
+      "Classifies a couch-potator rebase collision as mechanical or product, and resolves only mechanical ones",
+  })}# Rebase triage
 
 Two cards were built in parallel and now collide. You decide **which kind of collision
 this is** and, if it is mechanical, you fix it.
@@ -1938,14 +1972,14 @@ other card left on the base branch. You may never change what the owner sees.
 
 The prompt gives you the project name, the worktree, the branch, the base branch, this
 card's id and full body, the colliding card's id and full body, the full text of
-\`AGENTS.md\`, the fast-check commands, and the exact rebase error.
+\`${context.instructionsFile}\`, the fast-check commands, and the exact rebase error.
 
 A rebase was attempted and aborted. \`git status\` must show no rebase in progress. If it
 does, run \`git rebase --abort\` first and start again.
 
 ## Read first
 
-1. \`<worktree>/AGENTS.md\`
+1. \`<worktree>/${context.instructionsFile}\`
 2. \`<worktree>/${briefPath}\`
 3. The card you are adapting at \`<worktree>/${boardPath}/in-progress/<card-id>.md\`
 4. The colliding card's text, included in your prompt
@@ -1975,7 +2009,7 @@ How to fix:
 1. Resolve the conflicted files so both cards' behaviour survives.
 2. \`git add\` the resolved files.
 3. \`GIT_EDITOR=true git rebase --continue\` (never an interactive rebase; it hangs).
-4. Run the fast checks from \`AGENTS.md\` with the worktree as the working directory.
+4. Run the fast checks from \`${context.instructionsFile}\` with the worktree as the working directory.
 5. If a check fails because of your adaptation, fix it and amend before continuing.
 6. Return \`STATUS: REBASED\`.
 

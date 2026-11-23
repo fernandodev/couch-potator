@@ -6,9 +6,9 @@
 
 **A spec board that lives in your repository.**
 
-Plain-markdown cards, a read-only viewer, and OpenCode skills that take an idea
-from discovery to a verified, squash-merged change — without a database, a
-server, or a background process.
+Plain-markdown cards, a read-only viewer, and agent skills for OpenCode and
+Claude Code that take an idea from discovery to a verified, squash-merged change
+— without a database, a server, or a background process.
 
 ```text
 board/
@@ -72,10 +72,10 @@ couch-potator keeps the board in the same repository as the code:
 - **The board is the source of truth.** Cards are written in plain language:
   what the owner will see and how to check it. No framework names, no file
   layout, no implementation detail.
-- **Agents get a contract.** Four OpenCode skills (mechanics, planning,
-  unblocking, implementation) and two subagents read the same board you do. The
-  implementer works in a git worktree, verifies acceptance criteria and merges
-  one card at a time.
+- **Agents get a contract.** Four agent skills (mechanics, planning, unblocking,
+  implementation) and two subagents read the same board you do, whether you use
+  OpenCode or Claude Code. The implementer works in a git worktree, verifies
+  acceptance criteria and merges one card at a time.
 - **Nothing to run.** `view` writes one self-contained HTML file; everything
   else is a short-lived CLI command.
 
@@ -95,6 +95,7 @@ without a global install, use `npx couch-potator`:
 
 ```sh
 npx couch-potator init --name "Reading List"
+npx couch-potator init --target claude   # Claude Code instead of OpenCode
 ```
 
 The package is on npm at
@@ -124,13 +125,15 @@ couch-potator init --name "Reading List"
 ```
 
 `init` scaffolds the board, the brief, the config, the viewer target, the
-`.gitignore` entries and the OpenCode agent files:
+`.gitignore` entries and the agent files:
 
 ```text
 board/{todo,in-progress,blocked,done}/
 PROJECT.md                                          # name, milestone, brief
 .couch-potator/config.json                          # paths and verification checks
 .couch-potator/templates/card.md                    # default spec body for `add`
+
+# --target opencode (the default)
 .opencode/skills/couch-potator-board/SKILL.md       # board mechanics
 .opencode/skills/couch-potator-planner/SKILL.md     # product planning
 .opencode/skills/couch-potator-unblock/SKILL.md     # re-planning a blocked card
@@ -140,7 +143,18 @@ PROJECT.md                                          # name, milestone, brief
 .opencode/agents/couch-potator-implementer.md       # one-card worker subagent
 .opencode/agents/couch-potator-integrator.md        # rebase triage subagent
 AGENTS.md                                           # managed board block
+
+# --target claude
+.claude/skills/<skill-name>/SKILL.md                # same four skills
+.claude/commands/{unblock,implement}.md             # /unblock and /implement prompts
+.claude/agents/couch-potator-{implementer,integrator}.md
+CLAUDE.md                                           # managed board block
 ```
+
+`--target` picks the runtime: `opencode` (the default), `claude`, or `both`.
+Claude Code gets the `.claude/` layout and a managed `CLAUDE.md` block; OpenCode
+keeps its `.opencode/` layout and `AGENTS.md`. Reinstall later with
+`couch-potator skill install --target <name>`.
 
 `.couch-potator/viewer/` and `.couch-potator/worktrees/` are appended to
 `.gitignore`. Commit `board/`, `PROJECT.md` and the config; leave the generated
@@ -271,7 +285,7 @@ Done
 
 ### 5. Build it
 
-In an OpenCode session in the project:
+In an OpenCode or Claude Code session in the project:
 
 ```text
 /implement
@@ -348,7 +362,8 @@ cards.
 
 ## Planning with an agent
 
-`init` installs four OpenCode skills:
+`init` installs four agent skills, for OpenCode or Claude Code depending on
+`--target`:
 
 | Skill | Job |
 | --- | --- |
@@ -360,8 +375,9 @@ cards.
 The planner is the product manager. It does not write your product's code. It:
 
 - reads `PROJECT.md` and the board before every session;
-- asks the owner questions in small batches through OpenCode's `question` tool,
-  with concrete options and a recommendation;
+- asks the owner questions in small batches through the agent's question tool
+  (`question` in OpenCode, `AskUserQuestion` in Claude Code), with concrete
+  options and a recommendation;
 - writes cards and the brief as the answers arrive, not at the end;
 - uses `couch-potator` for every card change;
 - puts ready cards in `todo/` and cards with an open question in `blocked/`;
@@ -370,7 +386,7 @@ The planner is the product manager. It does not write your product's code. It:
 It discusses only *what* and *why*. Frameworks, libraries, file layout and code
 belong to the implementer, not the planner.
 
-To start, open an OpenCode session in the project and ask:
+To start, open an OpenCode or Claude Code session in the project and ask:
 
 ```text
 Use the couch-potator-planner skill. This is a reading-list app for one person.
@@ -398,7 +414,7 @@ with the owner's open questions. Start an unblock session with:
 ```
 
 The `couch-potator-unblock` skill shows the reason and the open questions before
-asking anything, then asks in small batches through OpenCode's `question` tool,
+asking anything, then asks in small batches through the agent's question tool,
 with a recommendation for each. It writes every answer to the card's
 `## Decisions` and, when the answer is project-wide, to the decision log in
 `PROJECT.md`. It then clears `blocked_reason`, removes the answered
@@ -425,7 +441,7 @@ the cards into the base branch one at a time.
 
 It never writes your product's code itself, never invents product behaviour and
 never starts the next milestone. If the board is ambiguous it stops and asks,
-through the same `question` tool the planner uses.
+through the same question tool the planner uses.
 
 Before the first run it asks for the verification commands once and stores them
 with `couch-potator checks` (see [Verification checks](#verification-checks)).
@@ -472,7 +488,7 @@ Exit codes: `0` success, `1` invalid board or failed validation, `2` usage error
 
 | Command | Effect |
 | --- | --- |
-| `couch-potator init [--name <n>] [--no-skill] [--force]` | Scaffold a board in the current folder. Idempotent; never overwrites `PROJECT.md`. `--no-skill` skips the agent files; `--force` rewrites them. |
+| `couch-potator init [--name <n>] [--target opencode\|claude\|both] [--no-skill] [--force]` | Scaffold a board in the current folder. Idempotent; never overwrites `PROJECT.md`. `--target` picks the agent runtime (default `opencode`); `--no-skill` skips the agent files; `--force` rewrites them. |
 | `couch-potator list [-c <col>] [-m <n>] [-k <kind>] [--all] [--json] [--ids]` | List cards, sorted by status, then `order`, then title. |
 | `couch-potator show <card> [--raw\|--path\|--json]` | Print a spec, its file path or its JSON. `<card>` may be an id or a unique prefix. |
 | `couch-potator check [--strict] [--json]` | Validate ids, links, cycles, orders, columns and in-progress surface collisions. Exit 1 on errors; `--strict` also fails on warnings. |
@@ -503,7 +519,7 @@ Exit codes: `0` success, `1` invalid board or failed validation, `2` usage error
 | Command | Effect |
 | --- | --- |
 | `couch-potator checks [--json]` / `checks set <fast\|full> <name> "<command>"` / `checks clear <fast\|full> [name]` | Show or edit the verification commands the implement skill runs. |
-| `couch-potator skill install [--force]` | (Re)install every OpenCode agent file and the `AGENTS.md` block. |
+| `couch-potator skill install [--target opencode\|claude\|both] [--force]` | (Re)install the agent files and managed instruction block for the chosen runtime. |
 | `couch-potator completion [install] [bash\|zsh\|fish] [--print] [--no-rc]` | Print or install shell completions (`sh` maps to bash). |
 
 ## Recipes
@@ -793,9 +809,12 @@ The viewer assets live in `src/viewer/assets/`; `scripts/build-assets.mjs` copie
 them and the marked/DOMPurify bundles into `dist/assets/` so the published
 package has no runtime frontend dependency.
 
-Generated agent files (skills, commands, subagents and the `AGENTS.md` block) are
-templates in `src/templates.ts`. Edit the template, never a generated copy in a
-target project, and update the tests and this README in the same commit.
+Generated agent files (skills, commands, subagents and the managed instruction
+block) are templates in `src/templates.ts`. The same content is rendered for
+OpenCode (`.opencode/` + `AGENTS.md`) and Claude Code (`.claude/` + `CLAUDE.md`),
+with target-specific frontmatter and tool names. Edit the template, never a
+generated copy in a target project, and update the tests and this README in the
+same commit.
 
 ## License
 

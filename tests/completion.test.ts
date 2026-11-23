@@ -49,6 +49,22 @@ describe("completionCandidates", () => {
     assert.ok(!flags.includes("--force"));
   });
 
+  it("offers the agent targets for init and skill install", () => {
+    const initFlags = completionCandidates({ current: "--", previous: ["init"] });
+    assert.ok(initFlags.includes("--target"));
+    assert.deepEqual(completionCandidates({ current: "", previous: ["init", "--target"] }), [
+      "opencode",
+      "claude",
+      "both",
+    ]);
+
+    const skillFlags = completionCandidates({ current: "--", previous: ["skill"] });
+    assert.ok(skillFlags.includes("--target"));
+    assert.deepEqual(completionCandidates({ current: "cl", previous: ["skill", "--target"] }), [
+      "claude",
+    ]);
+  });
+
   it("offers the checks command, its actions and phases", () => {
     assert.deepEqual(completionCandidates({ current: "chec", previous: [] }), [
       "check",

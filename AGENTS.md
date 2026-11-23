@@ -116,6 +116,18 @@ Rules:
   git push origin vX.Y.Z
   ```
 
+- Create the GitHub release as well as the tag. A tag alone leaves the
+  Releases page behind and hides the change list from users:
+
+  ```sh
+  gh release create vX.Y.Z --title vX.Y.Z --notes-file <notes>
+  ```
+
+  Write the notes from the release PR body and the commits since the previous
+  tag: a one-line summary, then a short paragraph and `-` bullets for the
+  user-facing changes. Do not paste the commit subjects. The newest release
+  becomes `Latest` automatically, so tag and release must always land together.
+
 - Do not move or reuse a tag after it is pushed.
 
 ## Publish after a version bump
@@ -123,13 +135,15 @@ Rules:
 Publish only after the release PR with the `chore(release): vX.Y.Z` bump is
 merged into `main`, so the published code, the tag and `main` agree.
 
-1. Confirm `main` has the version and the tag is reachable from it:
+1. Confirm `main` has the version, the tag is reachable from it and the
+   GitHub release exists:
 
    ```sh
    git switch main
    git pull --ff-only
    node -p "require('./package.json').version"
    git merge-base --is-ancestor vX.Y.Z main
+   gh release view vX.Y.Z
    ```
 
 2. Publish and verify:

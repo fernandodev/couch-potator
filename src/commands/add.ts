@@ -3,7 +3,7 @@ import path from "node:path";
 import { cyan, dim, green } from "../ansi.js";
 import { flag, list, parseCommandArgs, text, ROOT_OPTION } from "../args.js";
 import { nextOrder, scanBoard } from "../board.js";
-import { cardJson, normaliseSurfaces, today, writeCard, type Card } from "../card.js";
+import { cardJson, normaliseEnvironments, normaliseSurfaces, today, writeCard, type Card } from "../card.js";
 import { DEFAULT_KIND, isKind, resolveColumn } from "../columns.js";
 import { boardDir, CONFIG_DIR, relativeToRoot, resolveRoot } from "../config.js";
 import { UsageError } from "../errors.js";
@@ -21,6 +21,7 @@ const OPTIONS = {
   "depends-on": { type: "string" as const, short: "d", multiple: true },
   related: { type: "string" as const, short: "r", multiple: true },
   surface: { type: "string" as const, short: "s", multiple: true },
+  environment: { type: "string" as const, short: "e", multiple: true },
   body: { type: "string" as const, short: "b" },
   json: { type: "boolean" as const },
   root: ROOT_OPTION,
@@ -65,11 +66,20 @@ export async function addCommand(argv: string[]): Promise<number> {
   const dependsOn = list(values, "depends-on");
   const related = list(values, "related");
   const surfaces = normaliseSurfaces(list(values, "surface"));
+  const environments = normaliseEnvironments(list(values, "environment"));
   for (const dependency of dependsOn) {
     if (!board.byId.has(dependency)) warn(`depends_on "${dependency}" does not exist yet.`);
   }
   for (const sibling of related) {
     if (!board.byId.has(sibling)) warn(`related "${sibling}" does not exist yet.`);
+  }
+  const declaredEnvironments = Object.keys(board.config.environments);
+  for (const environment of environments) {
+    if (declaredEnvironments.length && !board.config.environments[environment]) {
+      warn(
+        `unknown environment "${environment}"; declared: ${declaredEnvironments.join(", ")}. It will run alone.`,
+      );
+    }
   }
   if (dependsOn.includes(id)) {
     throw new UsageError("A card cannot depend on itself.");
@@ -88,6 +98,7 @@ export async function addCommand(argv: string[]): Promise<number> {
     dependsOn,
     related,
     surfaces,
+    environments,
     blockedReason: null,
     completed: null,
     resolution: null,

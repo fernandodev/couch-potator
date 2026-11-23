@@ -17,6 +17,7 @@ export interface Card {
   dependsOn: string[];
   related: string[];
   surfaces: string[];
+  environments: string[];
   blockedReason: string | null;
   completed: string | null;
   resolution: string | null;
@@ -64,6 +65,15 @@ const asArray = (value: unknown): string[] => {
 
 /** Splits `"board-screen, card-panel"` into unique, trimmed surface names. */
 export function normaliseSurfaces(values: string[]): string[] {
+  return normaliseNames(values);
+}
+
+/** Splits `"browser, ios-sim"` into unique, trimmed environment names. */
+export function normaliseEnvironments(values: string[]): string[] {
+  return normaliseNames(values);
+}
+
+function normaliseNames(values: string[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const value of values) {
@@ -105,6 +115,7 @@ export function readCard(file: string, root: string, status: Column): Card {
     dependsOn: asArray(data.depends_on),
     related: asArray(data.related),
     surfaces: normaliseSurfaces(asArray(data.surfaces)),
+    environments: normaliseEnvironments(asArray(data.environments ?? data.environment)),
     blockedReason: asString(data.blocked_reason),
     completed: asString(data.completed),
     resolution: asString(data.resolution),
@@ -142,6 +153,8 @@ export function cardData(card: Card): Frontmatter {
   setOrDelete(data, "depends_on", card.dependsOn);
   setOrDelete(data, "related", card.related);
   setOrDelete(data, "surfaces", card.surfaces);
+  setOrDelete(data, "environments", card.environments);
+  delete data.environment;
   setOrDelete(data, "blocked_reason", card.blockedReason);
   setOrDelete(data, "completed", card.completed);
   setOrDelete(data, "resolution", card.resolution);
@@ -166,6 +179,7 @@ export interface CardJson {
   depends_on: string[];
   related: string[];
   surfaces: string[];
+  environments: string[];
   blocked_reason: string | null;
   completed: string | null;
   resolution: string | null;
@@ -186,6 +200,7 @@ export function cardJson(card: Card): CardJson {
     depends_on: card.dependsOn,
     related: card.related,
     surfaces: card.surfaces,
+    environments: card.environments,
     blocked_reason: card.blockedReason,
     completed: card.completed,
     resolution: card.resolution,

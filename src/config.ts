@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { CliError } from "./errors.js";
+import type { Issue } from "./types.js";
 
 export const CONFIG_DIR = ".couch-potator";
 
@@ -10,6 +11,20 @@ export type CheckPhase = (typeof CHECK_PHASES)[number];
 /** Named shell commands, grouped by when the implementer runs them. */
 export type Checks = Record<CheckPhase, Record<string, string>>;
 
+/**
+ * A runtime a card needs in order to witness its acceptance criteria: a dev
+ * server, a desktop window, a simulator, an emulator, a staging service. The
+ * name is the project's own word; `concurrency` is how many isolated instances
+ * of it may exist at the same time.
+ */
+export interface Environment {
+  concurrency: number;
+  /** How to start one isolated instance. Project-specific, shown to agents. */
+  hint: string | null;
+}
+
+export type Environments = Record<string, Environment>;
+
 export interface Config {
   version: 1;
   board: string;
@@ -18,9 +33,13 @@ export interface Config {
     out: string;
   };
   checks: Checks;
+  environments: Environments;
+  /** Environment used when a visible card does not name one. */
+  defaultEnvironment: string | null;
 }
 
 export const emptyChecks = (): Checks => ({ fast: {}, full: {} });
+export const emptyEnvironments = (): Environments => ({});
 
 export const DEFAULT_CONFIG: Config = {
   version: 1,
@@ -30,6 +49,8 @@ export const DEFAULT_CONFIG: Config = {
     out: `${CONFIG_DIR}/viewer/board.html`,
   },
   checks: emptyChecks(),
+  environments: emptyEnvironments(),
+  defaultEnvironment: null,
 };
 
 function normaliseChecks(value: unknown): Checks {
@@ -46,6 +67,69 @@ function normaliseChecks(value: unknown): Checks {
     }
   }
   return checks;
+}
+
+function normaliseEnvironments(value: unknown): Environments {
+  const environments = emptyEnvironments();
+  if (!value || typeof value !== "object" || Array.isArray(value)) return environments;
+
+  for (const [rawName, rawEnvironment] of Object.entries(value as Record<string, unknown>)) {
+    const name = rawName.trim();
+    if (!name) continue;
+
+    const source =
+      rawEnvironment && typeof rawEnvironment === "object" && !Array.isArray(rawEnvironment)
+        ? (rawEnvironment as Record<string, unknown>)
+        : {};
+    const rawConcurrency = source.concurrency;
+    const concurrency =
+      typeof rawConcurrency === "number" && Number.isInteger(rawConcurrency) && rawConcurrency > 0
+        ? rawConcurrency
+        : 1;
+
+    environments[name] = {
+      concurrency,
+      hint: typeof source.hint === "string" && source.hint.trim() ? source.hint.trim() : null,
+    };
+  }
+  return environments;
+}
+
+const ENVIRONMENT_NAME = /^[a-z0-9][a-z0-9_-]*$/i;
+
+/** Problems in the config itself, reported by `couch-potator check`. */
+export function configIssues(config: Config): Issue[] {
+  const issues: Issue[] = [];
+  const names = Object.keys(config.environments);
+
+  for (const name of names) {
+    if (!ENVIRONMENT_NAME.test(name)) {
+      issues.push({
+        level: "warning",
+        message: `Environment "${name}" should be a short lowercase name such as browser or ios-sim.`,
+        file: `${CONFIG_DIR}/config.json`,
+      });
+    }
+  }
+
+  if (config.defaultEnvironment && !config.environments[config.defaultEnvironment]) {
+    issues.push({
+      level: "warning",
+      message: `default_environment "${config.defaultEnvironment}" is not declared under environments.`,
+      file: `${CONFIG_DIR}/config.json`,
+    });
+  }
+
+  if (names.length > 1 && !config.defaultEnvironment) {
+    issues.push({
+      level: "warning",
+      message:
+        "More than one environment is declared but default_environment is not set; cards with surfaces must name one.",
+      file: `${CONFIG_DIR}/config.json`,
+    });
+  }
+
+  return issues;
 }
 
 export function configPath(root: string): string {
@@ -89,6 +173,7 @@ export function loadConfig(root: string): Config {
       ...DEFAULT_CONFIG,
       viewer: { ...DEFAULT_CONFIG.viewer },
       checks: emptyChecks(),
+      environments: emptyEnvironments(),
     };
   }
 
@@ -99,23 +184,36 @@ export function loadConfig(root: string): Config {
     throw new CliError(`Invalid config at ${file}: ${(error as Error).message}`);
   }
 
-  const source = (parsed ?? {}) as Partial<Config>;
+  const source = (parsed ?? {}) as Record<string, unknown>;
+  const rawDefault = source.default_environment ?? source.defaultEnvironment;
+  const defaultEnvironment =
+    typeof rawDefault === "string" && rawDefault.trim() ? rawDefault.trim() : null;
+  const viewer =
+    source.viewer && typeof source.viewer === "object" && !Array.isArray(source.viewer)
+      ? (source.viewer as Record<string, unknown>)
+      : {};
+
   return {
     version: 1,
     board: typeof source.board === "string" && source.board ? source.board : DEFAULT_CONFIG.board,
     brief: typeof source.brief === "string" && source.brief ? source.brief : DEFAULT_CONFIG.brief,
     viewer: {
       out:
-        typeof source.viewer?.out === "string" && source.viewer.out
-          ? source.viewer.out
-          : DEFAULT_CONFIG.viewer.out,
+        typeof viewer.out === "string" && viewer.out ? viewer.out : DEFAULT_CONFIG.viewer.out,
     },
     checks: normaliseChecks(source.checks),
+    environments: normaliseEnvironments(source.environments),
+    defaultEnvironment,
   };
 }
 
 export function saveConfig(root: string, config: Config): void {
-  writeFileSync(configPath(root), `${JSON.stringify(config, null, 2)}\n`, "utf8");
+  const { defaultEnvironment, ...rest } = config;
+  const json = {
+    ...rest,
+    ...(defaultEnvironment ? { default_environment: defaultEnvironment } : {}),
+  };
+  writeFileSync(configPath(root), `${JSON.stringify(json, null, 2)}\n`, "utf8");
 }
 
 export function boardDir(root: string, config: Config): string {

@@ -1,7 +1,7 @@
 import { cyan, dim, green } from "../ansi.js";
 import { parseCommandArgs, text, ROOT_OPTION } from "../args.js";
 import { resolveCard, scanBoard } from "../board.js";
-import { normaliseSurfaces, today, writeCard } from "../card.js";
+import { normaliseEnvironments, normaliseSurfaces, today, writeCard } from "../card.js";
 import { isKind, KINDS } from "../columns.js";
 import { resolveRoot } from "../config.js";
 import { UsageError } from "../errors.js";
@@ -20,6 +20,9 @@ const FIELD_ALIASES: Record<string, string> = {
   title: "title",
   surfaces: "surfaces",
   surface: "surfaces",
+  environments: "environments",
+  environment: "environments",
+  env: "environments",
   blocked_reason: "blocked_reason",
   blocked: "blocked_reason",
   reason: "blocked_reason",
@@ -43,7 +46,7 @@ export async function setCommand(argv: string[]): Promise<number> {
   if (!field) {
     throw new UsageError(`Unknown field "${rawField}".`, {
       details: [
-        "kind, milestone, priority, order, title, surfaces, blocked_reason, resolution, completed",
+        "kind, milestone, priority, order, title, surfaces, environments, blocked_reason, resolution, completed",
       ],
     });
   }
@@ -87,6 +90,10 @@ export async function setCommand(argv: string[]): Promise<number> {
     case "surfaces":
       card.surfaces = clear ? [] : normaliseSurfaces([raw]);
       shown = card.surfaces.length ? card.surfaces.join(", ") : null;
+      break;
+    case "environments":
+      card.environments = clear ? [] : normaliseEnvironments([raw]);
+      shown = card.environments.length ? card.environments.join(", ") : null;
       break;
     case "blocked_reason":
       card.blockedReason = clear ? null : raw;

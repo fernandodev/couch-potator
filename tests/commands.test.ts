@@ -43,6 +43,9 @@ describe("init", () => {
     assert.equal(existsSync(path.join(root, "board", "blocked")), true);
     assert.equal(existsSync(path.join(root, "board", "done")), true);
     assert.equal(existsSync(path.join(root, ".couch-potator", "config.json")), true);
+    const config = JSON.parse(readFileSync(path.join(root, ".couch-potator", "config.json"), "utf8"));
+    assert.deepEqual(config.environments, {});
+    assert.equal("default_environment" in config, false);
     assert.equal(existsSync(path.join(root, "PROJECT.md")), true);
     assert.equal(existsSync(path.join(root, "AGENTS.md")), true);
     assert.equal(
@@ -366,6 +369,30 @@ describe("add", () => {
     ]);
   });
 
+  it("records environments and warns when they are not declared", async () => {
+    writeFileSync(
+      path.join(root, ".couch-potator", "config.json"),
+      JSON.stringify({ environments: { browser: { concurrency: 3 } } }, null, 2),
+    );
+
+    await addCommand([
+      "--root",
+      root,
+      "Change the board",
+      "-e",
+      "browser",
+      "-e",
+      "ios-sim,android",
+    ]);
+    const board = scanBoard(root);
+    assert.deepEqual(board.byId.get("change-the-board")?.environments, [
+      "browser",
+      "ios-sim",
+      "android",
+    ]);
+    assert.match(output.logs.join(""), /unknown environment "ios-sim"/);
+  });
+
   it("uses the project card template for new bodies", async () => {
     writeFileSync(
       path.join(root, ".couch-potator", "templates", "card.md"),
@@ -435,6 +462,19 @@ describe("list and show", () => {
     output.clear();
     await showCommand(["--root", root, "visible-change"]);
     assert.match(output.logs.join(""), /surfaces\s+board-screen, card-panel/);
+  });
+
+  it("exposes environments in JSON and in the plain spec", async () => {
+    await addCommand(["--root", root, "Visible change", "-e", "browser,ios-sim"]);
+
+    output.clear();
+    await showCommand(["--root", root, "visible-change", "--json"]);
+    const json = JSON.parse(output.logs.join(""));
+    assert.deepEqual(json.environments, ["browser", "ios-sim"]);
+
+    output.clear();
+    await showCommand(["--root", root, "visible-change"]);
+    assert.match(output.logs.join(""), /environments\s+browser, ios-sim/);
   });
 });
 
@@ -518,6 +558,18 @@ describe("set", () => {
     await setCommand(["--root", root, "card", "surfaces", "-"]);
     board = scanBoard(root);
     assert.deepEqual(board.byId.get("card")?.surfaces, []);
+  });
+
+  it("sets and clears environments", async () => {
+    await addCommand(["--root", root, "Card"]);
+    await setCommand(["--root", root, "card", "env", "browser, ios-sim"]);
+
+    let board = scanBoard(root);
+    assert.deepEqual(board.byId.get("card")?.environments, ["browser", "ios-sim"]);
+
+    await setCommand(["--root", root, "card", "environment", "-"]);
+    board = scanBoard(root);
+    assert.deepEqual(board.byId.get("card")?.environments, []);
   });
 
   it("rejects unknown kinds", async () => {

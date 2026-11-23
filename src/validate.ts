@@ -1,7 +1,8 @@
 import { COLUMNS } from "./columns.js";
 import type { Board } from "./board.js";
 import type { Card } from "./card.js";
-import { relativeToRoot } from "./config.js";
+import { CONFIG_DIR, relativeToRoot } from "./config.js";
+import { environmentIsAmbiguous } from "./environments.js";
 import type { Issue } from "./types.js";
 
 function canonicalCycle(cycle: string[]): string[] {
@@ -147,6 +148,25 @@ export function validateBoard(board: Board): Issue[] {
       issues.push({
         level: "warning",
         message: "Card is blocked but has no blocked_reason.",
+        file,
+      });
+    }
+
+    const declaredEnvironments = Object.keys(board.config.environments);
+    for (const environment of card.environments) {
+      if (declaredEnvironments.length && !board.config.environments[environment]) {
+        issues.push({
+          level: "warning",
+          message: `environment "${environment}" is not declared in ${CONFIG_DIR}/config.json; it runs alone.`,
+          file,
+        });
+      }
+    }
+    if (environmentIsAmbiguous(card, board.config)) {
+      issues.push({
+        level: "warning",
+        message:
+          "Card has surfaces but no environment, and the project declares several; name one or set default_environment.",
         file,
       });
     }

@@ -130,3 +130,68 @@ describe("validateBoard", () => {
     assert.ok(warnings.some((message) => message.includes("current_milestone 9")));
   });
 });
+
+describe("environments", () => {
+  const configFile = (): string => path.join(root, ".couch-potator", "config.json");
+  const messages = (): string[] =>
+    validateBoard(scanBoard(root)).map((issue) => issue.message);
+
+  it("warns about an environment the config does not declare", () => {
+    writeFileSync(
+      configFile(),
+      JSON.stringify({ environments: { browser: { concurrency: 3 } } }, null, 2),
+    );
+    write("todo", "card", "title: Card\nsurfaces: [board-screen]\nenvironments: [ios-sim]");
+
+    assert.match(messages().join("\n"), /environment "ios-sim" is not declared/);
+  });
+
+  it("warns when several environments are declared without a default", () => {
+    writeFileSync(
+      configFile(),
+      JSON.stringify({
+        environments: { browser: { concurrency: 3 }, ios: { concurrency: 2 } },
+      }),
+      "utf8",
+    );
+    write("todo", "card", "title: Card\nsurfaces: [board-screen]");
+
+    const found = messages();
+    assert.ok(found.some((message) => message.includes("More than one environment")));
+    assert.ok(found.some((message) => message.includes("name one or set default_environment")));
+  });
+
+  it("accepts a declared default and a named environment", () => {
+    writeFileSync(
+      configFile(),
+      JSON.stringify({
+        environments: { browser: { concurrency: 3 }, ios: { concurrency: 2 } },
+        default_environment: "browser",
+      }),
+      "utf8",
+    );
+    write("todo", "one", "title: One\nsurfaces: [board-screen]");
+    write("todo", "two", "title: Two\nsurfaces: [board-screen]\nenvironments: [ios]");
+
+    assert.equal(
+      messages().some((message) => message.toLowerCase().includes("environment")),
+      false,
+    );
+  });
+
+  it("warns about a default that is not declared", () => {
+    writeFileSync(
+      configFile(),
+      JSON.stringify({
+        environments: { browser: { concurrency: 3 } },
+        default_environment: "app",
+      }),
+      "utf8",
+    );
+    write("todo", "card", "title: Card");
+
+    assert.ok(
+      messages().some((message) => message.includes('default_environment "app"')),
+    );
+  });
+});

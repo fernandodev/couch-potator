@@ -1277,6 +1277,15 @@ owns only the code inside its worktree.
 - Never overwrite an existing app folder, \`${context.instructionsFile}\`, \`README.md\`, or git
   repository.
 - Never commit secrets, \`.env\` files, keys, \`node_modules\`, or build output.
+- **Kill only what the run started.** A worker stops a process by the PID it recorded,
+  never with \`pkill\`, \`killall\` or a pattern, and never stops an app or service it did
+  not start.
+- **Never type into an unchecked window.** Before every synthetic keystroke, click or
+  type, a worker confirms the window it is driving is frontmost, and it prefers the
+  accessibility tree, test hooks or an API over simulated input. It never sends input
+  to the owner's own apps.
+- **Scratch stays local.** Temporary files, fixtures and evidence live under the
+  worktree or \`$TMPDIR\`, never a bare \`/tmp\` path, the home folder or another project.
 - One fresh worker per card, always. Never reuse a worker session, even for a retry.
 - One commit per card branch, so a rebase can conflict at most once.
 - Use \`${command}\` for every board change. Do not hand-edit frontmatter or move card
@@ -1531,6 +1540,7 @@ The worker brief must contain:
 - the fast-check commands;
 - the environment slots it may use, with the instance values from the project's run
   recipe, or exactly \`Do not start any environment.\`;
+- the safety rules in §3e;
 - the witness rule in §3d;
 - \`Return the STATUS block from your instructions exactly. Do not edit the board,
   ${context.instructionsFile}, README.md or ${briefPath}.\`
@@ -1589,6 +1599,32 @@ merge the preview branch into the base; cards still land one at a time.
 
 Runtime artefacts stay out of the repository. Put screenshots and logs under
 \`.couch-potator/evidence/<card-id>/\` and never commit them.
+
+### 3e. Safety
+
+A worker runs on the owner's machine, not in a sandbox. Its desktop, processes and files
+are shared with the owner, so these rules bind every worker and every command you run
+yourself.
+
+- **Kill only what you started.** Record the PID when you launch a process, and stop it
+  with that PID after checking it is still the process you launched. Never use
+  \`pkill\`, \`killall\`, \`kill $(pgrep ...)\` or any name- or pattern-based kill; they can
+  hit the owner's editor, browser or agent. Use the app's own stop command or a child
+  process handle when there is one.
+- **Check focus before every gesture.** Before any synthetic keystroke, click, scroll or
+  type, confirm the frontmost application is the window you are driving, and check again
+  immediately before each gesture because focus can move between commands. If another
+  app is frontmost, stop; never type into whatever happens to be focused.
+- **Prefer accessibility over input.** Drive the product through its accessibility tree,
+  test hooks, URLs, CLI or HTTP API before synthesizing input. Use \`osascript\` or
+  AXUIElement, the simulator tooling, Playwright or the stack's test runner first; send
+  keys or clicks only to an app you launched yourself, and never to the owner's own apps.
+- **Keep scratch local.** Temporary files, fixtures, screenshots and logs go under
+  \`<worktree>/.couch-potator/scratch/\` or \`$TMPDIR\`. Never use a bare \`/tmp\` path, the
+  home folder or another project, and never reuse an unrelated folder as a test subject:
+  create a fresh directory with \`mktemp -d\` when you need one. Never commit scratch.
+- **Stop what you started.** Shut down services and helper processes before returning,
+  unless the environment slot passes straight to another worker.
 
 ## 4. Collect and integrate
 
@@ -1922,6 +1958,8 @@ At the start of every run:
 - Let two workers use one environment instance at the same time.
 - Let a worker start an environment you did not assign, or claim evidence it did not
   produce.
+- Let a worker kill by name or pattern, type into a window it did not confirm as
+  frontmost, or write scratch files outside its worktree or \`$TMPDIR\`.
 - Add \`--force\`, \`-f\`, or \`-D\` to a command that is not listed here.
 `;
 }
@@ -1959,6 +1997,31 @@ Everything you need is in the prompt and in your worktree.
 The prompt gives you the absolute worktree path and the branch. It is already checked
 out for you. Work only there. Never \`cd\` into another worktree, another project, or the
 main project folder.
+
+## Safety
+
+The machine is not a sandbox. The owner's desktop, processes and files are shared with
+you, so these rules come before any acceptance criterion.
+
+- **Kill only what you started.** Record the PID when you launch a process, and stop it
+  with that PID after checking it is still the process you launched. Never use
+  \`pkill\`, \`killall\`, \`kill $(pgrep ...)\` or any name- or pattern-based kill; they can
+  hit the owner's editor, browser or agent. Use the app's own stop command or a child
+  process handle when there is one, and never stop a process you did not start.
+- **Check focus before every gesture.** Before any synthetic keystroke, click, scroll or
+  type, confirm the frontmost application is the window you are driving, and check again
+  immediately before each gesture because focus can move between commands. If another
+  app is frontmost, stop; never type into whatever happens to be focused.
+- **Prefer accessibility over input.** Drive the product through its accessibility tree,
+  test hooks, URLs, CLI or HTTP API before synthesizing input. Use \`osascript\` or
+  AXUIElement, the simulator tooling, Playwright or the stack's test runner first; send
+  keys or clicks only to an app you launched yourself, and never to the owner's own apps.
+- **Keep scratch local.** Temporary files, fixtures, screenshots and logs go under
+  \`<worktree>/.couch-potator/scratch/\` or \`$TMPDIR\`. Never use a bare \`/tmp\` path, the
+  home folder or another project, and never reuse an unrelated folder as a test subject:
+  create a fresh directory with \`mktemp -d\` when you need one. Never commit scratch.
+- **Stop what you started.** Shut down services and helper processes before returning,
+  unless the orchestrator hands the environment slot to the next worker.
 
 ## Read first
 

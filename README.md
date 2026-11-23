@@ -480,6 +480,13 @@ marks a card done without verification. `--parallel` bounds how many cards are
 **checked** at once. A single-instance product still builds cards in parallel and
 queues their checks; see [Environments](#environments).
 
+Workers run on your machine, so they are held to three safety rules. A worker
+stops only processes it started, by recorded PID, and never uses `pkill`,
+`killall` or a pattern kill. Before any synthetic keystroke or click it confirms
+its own window is frontmost, and it prefers accessibility APIs, test hooks or an
+HTTP API over simulated input. Scratch files, fixtures and evidence stay under
+the worktree or `$TMPDIR`, never a bare `/tmp` path or another project's folder.
+
 If the project root is not a git repository yet, the skill initializes one
 automatically — but it stops and asks if the staged files look like secrets or
 build output, or if no git identity is configured.

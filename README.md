@@ -486,7 +486,10 @@ build output, or if no git identity is configured.
 
 ## Command reference
 
-Global flags work anywhere: `--root <path>`, `--help`, `--version`.
+Global flags: `--root <path>` and `--version`. Every command accepts
+`-h` or `--help`; `couch-potator help <command>` prints the same text. Help
+covers usage, arguments, options, notes and examples, and never reads the board,
+so it works outside a project too.
 
 Exit codes: `0` success, `1` invalid board or failed validation, `2` usage error
 (unknown card, unknown column, bad flag).
@@ -502,6 +505,7 @@ Exit codes: `0` success, `1` invalid board or failed validation, `2` usage error
 | `couch-potator next [--parallel <1-3>] [--json]` | Pick the next ready cards, in dependency/priority/order/kind order, and report the batch, held-back, waiting, blocked and in-progress cards plus the environment pools. |
 | `couch-potator graph [--format text\|mermaid\|dot] [-m <n>]` | Print the dependency graph without a browser. |
 | `couch-potator view [--watch] [--no-open] [--milestone <n\|all>] [--out <path>]` | Generate and open the read-only viewer. |
+| `couch-potator help [command]` | Print the command list, or usage, arguments, options, notes and examples for one command. |
 
 ### Cards
 

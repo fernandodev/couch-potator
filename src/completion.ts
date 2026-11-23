@@ -189,6 +189,7 @@ const FLAGS: Record<string, Record<string, FlagSpec>> = {
   skill: {
     "-f": { takesValue: false },
     "--force": { takesValue: false },
+    "--update": { takesValue: false },
     "--target": { takesValue: true, source: "target" },
   },
   completion: {
@@ -395,7 +396,7 @@ function positionalCandidates(
       if (index === 1) return [...CHECK_PHASES];
       return [];
     case "skill":
-      return index === 0 ? ["install"] : [];
+      return index === 0 ? ["install", "update"] : [];
     case "completion": {
       if (index === 0) return ["install", ...SHELLS];
       if (positionals[0] === "install" && index === 1) return [...SHELLS];

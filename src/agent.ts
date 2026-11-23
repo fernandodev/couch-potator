@@ -37,9 +37,22 @@ const LEGACY_SKILL_NAME = "board";
 const LEGACY_SKILL_TITLE = "Board Viewer";
 
 export interface InstallResult {
+  /** Files created for the first time. */
   written: string[];
+  /** Existing files replaced because they differed from the template. */
+  updated: string[];
   skipped: string[];
   removed: string[];
+}
+
+export interface InstallOptions {
+  force?: boolean;
+  target?: InstallTarget;
+  /**
+   * Refresh managed files that changed since they were installed. Unlike
+   * `force`, files whose content already matches are left untouched.
+   */
+  update?: boolean;
 }
 
 /** Accepts the names people actually type for the two agent runtimes. */
@@ -112,6 +125,18 @@ export function integratorAgentPath(root: string, target: AgentTarget = "opencod
   return path.join(root, baseDir(target), "agents", `${INTEGRATOR_AGENT_NAME}.md`);
 }
 
+/**
+ * The runtimes a project already has couch-potator skills for. Update uses it
+ * to refresh whichever target was installed instead of guessing OpenCode.
+ */
+export function detectInstalledTargets(root: string): AgentTarget[] {
+  return (["opencode", "claude"] as const).filter((target) =>
+    [skillPath, plannerSkillPath, unblockSkillPath, implementSkillPath].some((agentPath) =>
+      existsSync(agentPath(root, target)),
+    ),
+  );
+}
+
 // Earlier versions shipped `.opencode/skills/board/SKILL.md`. Remove it on
 // install so a renamed skill never leaves two competing copies behind.
 function removeLegacySkill(root: string, removed: string[]): void {
@@ -130,14 +155,9 @@ function removeLegacySkill(root: string, removed: string[]): void {
   removed.push(relativeToRoot(root, file));
 }
 
-function writeManagedBlock(
-  root: string,
-  file: string,
-  block: string,
-  written: string[],
-  skipped: string[],
-): void {
-  const existing = existsSync(file) ? readFileSync(file, "utf8") : "";
+function writeManagedBlock(root: string, file: string, block: string, result: InstallResult): void {
+  const existed = existsSync(file);
+  const existing = existed ? readFileSync(file, "utf8") : "";
   const start = existing.indexOf(AGENTS_START);
   const end = existing.indexOf(AGENTS_END);
 
@@ -151,16 +171,16 @@ function writeManagedBlock(
 
   if (next !== existing) {
     writeFileSync(file, next, "utf8");
-    written.push(relativeToRoot(root, file));
+    (existed ? result.updated : result.written).push(relativeToRoot(root, file));
   } else {
-    skipped.push(relativeToRoot(root, file));
+    result.skipped.push(relativeToRoot(root, file));
   }
 }
 
 function installTarget(
   root: string,
   target: AgentTarget,
-  options: { force?: boolean },
+  options: InstallOptions,
   result: InstallResult,
 ): void {
   const context = templateContext(root, target);
@@ -176,30 +196,23 @@ function installTarget(
   ];
 
   for (const [file, content] of agentFiles) {
-    if (!existsSync(file) || options.force) {
+    const existed = existsSync(file);
+    const changed = existed && readFileSync(file, "utf8") !== content;
+    if (!existed || options.force || (options.update && changed)) {
       mkdirSync(path.dirname(file), { recursive: true });
       writeFileSync(file, content, "utf8");
-      result.written.push(relativeToRoot(root, file));
+      (existed ? result.updated : result.written).push(relativeToRoot(root, file));
     } else {
       result.skipped.push(relativeToRoot(root, file));
     }
   }
 
   if (target === "opencode") removeLegacySkill(root, result.removed);
-  writeManagedBlock(
-    root,
-    instructionsPath(root, target),
-    agentsBlock(context),
-    result.written,
-    result.skipped,
-  );
+  writeManagedBlock(root, instructionsPath(root, target), agentsBlock(context), result);
 }
 
-export function installAgentFiles(
-  root: string,
-  options: { force?: boolean; target?: InstallTarget } = {},
-): InstallResult {
-  const result: InstallResult = { written: [], skipped: [], removed: [] };
+export function installAgentFiles(root: string, options: InstallOptions = {}): InstallResult {
+  const result: InstallResult = { written: [], updated: [], skipped: [], removed: [] };
   const target = options.target ?? "opencode";
   const targets: AgentTarget[] = target === "both" ? ["opencode", "claude"] : [target];
 

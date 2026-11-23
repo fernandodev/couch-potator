@@ -398,23 +398,35 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   },
   skill: {
     name: "skill",
-    summary: "Install the agent skills and subagents",
-    usage: ["couch-potator skill [install] [options]"],
+    summary: "Install or update the agent skills and subagents",
+    usage: ["couch-potator skill [install|update] [options]"],
     options: [
       { names: ["-f", "--force"], description: "Rewrite existing files" },
+      {
+        names: ["--update"],
+        description: "Refresh installed files from this version (same as the update action)",
+      },
       {
         names: ["--target"],
         value: "runtime",
         description: "opencode, claude or both (default: opencode)",
       },
     ],
-    actions: [{ name: "install", description: "Install the agent files (the default action)" }],
+    actions: [
+      { name: "install", description: "Install the agent files (the default action)" },
+      {
+        name: "update",
+        description: "Refresh installed files to this version, keeping matching files",
+      },
+    ],
     notes: [
       "Installs the board, planner, unblock and implement skills, the /unblock and /implement commands, the implementer and integrator subagents, and the managed instruction block.",
+      "Update detects the runtimes already installed in the project and rewrites only files whose content changed; pass --target to pick one explicitly.",
     ],
     examples: [
       "couch-potator skill install",
       "couch-potator skill install --target claude --force",
+      "couch-potator skill update",
     ],
   },
   completion: {

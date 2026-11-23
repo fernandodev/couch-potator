@@ -343,6 +343,76 @@ describe("init", () => {
       rmSync(other, { recursive: true, force: true });
     }
   });
+
+  it("updates installed agent files to the current templates", async () => {
+    const boardSkill = path.join(
+      root,
+      ".opencode",
+      "skills",
+      "couch-potator-board",
+      "SKILL.md",
+    );
+    const stale = "---\nname: couch-potator-board\ndescription: stale\n---\n\n# Old\n";
+    writeFileSync(boardSkill, stale, "utf8");
+    output.clear();
+
+    await skillCommand(["--root", root, "update"]);
+
+    assert.notEqual(readFileSync(boardSkill, "utf8"), stale);
+    assert.match(readFileSync(boardSkill, "utf8"), /couch-potator/);
+    assert.match(output.logs.join("\n"), /updated/);
+    assert.match(output.logs.join("\n"), /up to date/);
+  });
+
+  it("accepts --update as an alias for the update action", async () => {
+    const boardSkill = path.join(
+      root,
+      ".opencode",
+      "skills",
+      "couch-potator-board",
+      "SKILL.md",
+    );
+    writeFileSync(boardSkill, "stale\n", "utf8");
+
+    await skillCommand(["--root", root, "--update"]);
+
+    assert.match(readFileSync(boardSkill, "utf8"), /couch-potator/);
+  });
+
+  it("updates the runtime already installed without --target", async () => {
+    const other = mkdtempSync(path.join(tmpdir(), "cpt-skillupdate-"));
+    try {
+      await initCommand(["--root", other, "--target", "claude"]);
+      const boardSkill = path.join(other, ".claude", "skills", "couch-potator-board", "SKILL.md");
+      writeFileSync(boardSkill, "stale\n", "utf8");
+
+      await skillCommand(["--root", other, "update"]);
+
+      assert.match(readFileSync(boardSkill, "utf8"), /couch-potator/);
+      assert.equal(existsSync(path.join(other, ".opencode")), false);
+    } finally {
+      rmSync(other, { recursive: true, force: true });
+    }
+  });
+
+  it("reports when an update changes nothing", async () => {
+    output.clear();
+
+    await skillCommand(["--root", root, "update"]);
+
+    assert.match(output.logs.join("\n"), /Everything is up to date/);
+    assert.doesNotMatch(output.logs.join("\n"), /updated/);
+  });
+
+  it("refuses to update a project without agent files", async () => {
+    const other = mkdtempSync(path.join(tmpdir(), "cpt-skillmissing-"));
+    try {
+      await initCommand(["--root", other, "--no-skill"]);
+      await assert.rejects(() => skillCommand(["--root", other, "update"]), /No couch-potator/);
+    } finally {
+      rmSync(other, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("add", () => {

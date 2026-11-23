@@ -157,6 +157,12 @@ Claude Code gets the `.claude/` layout and a managed `CLAUDE.md` block; OpenCode
 keeps its `.opencode/` layout and `AGENTS.md`. Reinstall later with
 `couch-potator skill install --target <name>`.
 
+When a newer couch-potator ships changed skills, refresh an existing project
+with `couch-potator skill update` (or `couch-potator skill --update`). It detects
+the runtimes already installed, rewrites only the managed files whose content
+changed, adds files that are new in this version, and leaves matching files
+alone. Pass `--target` to refresh one runtime explicitly.
+
 `.couch-potator/viewer/` and `.couch-potator/worktrees/` are appended to
 `.gitignore`. Commit `board/`, `PROJECT.md` and the config; leave the generated
 page and the implementation worktrees out.
@@ -537,7 +543,7 @@ Exit codes: `0` success, `1` invalid board or failed validation, `2` usage error
 | Command | Effect |
 | --- | --- |
 | `couch-potator checks [--json]` / `checks set <fast\|full> <name> "<command>"` / `checks clear <fast\|full> [name]` | Show or edit the verification commands the implement skill runs. |
-| `couch-potator skill install [--target opencode\|claude\|both] [--force]` | (Re)install the agent files and managed instruction block for the chosen runtime. |
+| `couch-potator skill install [--target opencode\|claude\|both] [--force]` / `skill update [--target ...]` | Install the agent files, or refresh them to this version. Update detects installed runtimes, rewrites changed files and adds new ones without touching files that already match. `--update` is an alias for the update action. |
 | `couch-potator completion [install] [bash\|zsh\|fish] [--print] [--no-rc]` | Print or install shell completions (`sh` maps to bash). |
 
 ## Recipes

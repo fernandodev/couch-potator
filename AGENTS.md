@@ -32,6 +32,12 @@ the build.
 
 ## Branch, merge through a pull request
 
+Every implementation, however small, follows the same loop: branch from a fresh
+`main`, make the change and commit it, open the pull request and merge it once
+the checks pass, then update local `main` and continue from that fresh branch
+with everything pulled. Never implement directly on `main` and never leave
+finished work sitting on an unmerged branch.
+
 `main` is protected: the `Node 20`, `Node 22` and `Node 24` checks must pass,
 strict mode requires the branch to be up to date, and admin enforcement is on.
 Never commit or push to `main` directly; every change lands through a pull

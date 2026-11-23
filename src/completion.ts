@@ -269,7 +269,7 @@ function flagSpec(command: string, name: string): FlagSpec | undefined {
 }
 
 function flagNames(command: string): string[] {
-  return [...Object.keys(flagsFor(command)), ROOT_FLAG];
+  return [...new Set([...Object.keys(flagsFor(command)), ROOT_FLAG, "-h", "--help"])];
 }
 
 function filterCandidates(candidates: readonly string[], prefix: string): string[] {
@@ -429,7 +429,7 @@ export function completionCandidates(request: CompletionRequest): string[] {
   const projectRoot = root ?? request.root ?? null;
 
   if (!command) {
-    return filterCandidates([...COMMANDS, "--help", "--version"], current);
+    return filterCandidates([...COMMANDS, "-h", "--help", "-v", "--version"], current);
   }
 
   const inline = /^(--[a-z0-9-]+)=(.*)$/.exec(current);

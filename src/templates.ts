@@ -123,6 +123,13 @@ _Who uses it, and what they need._
 | --- | --- | --- | --- |
 | | | | |
 
+## Run and verify
+
+_How to run each environment a check needs, and how to tell it works. One entry per
+environment the project declares: the command, how to give an instance its own port,
+bundle identifier, data folder, simulator or emulator, how many can run at once, and
+how to capture evidence. Leave this empty for a product with no runtime._
+
 ## Design direction
 
 _References, anti-references, tone, brand._
@@ -172,8 +179,8 @@ ${boardPath}/done/*.md
 
 Every card is a markdown spec. Its folder is its status, its file name is its id,
 and its frontmatter holds \`title\`, \`kind\`, \`milestone\`, \`depends_on\`,
-\`related\`, \`surfaces\`, \`blocked_reason\` and \`resolution\`. There are exactly
-four columns; never create a fifth folder.
+\`related\`, \`surfaces\`, \`environments\`, \`blocked_reason\` and \`resolution\`.
+There are exactly four columns; never create a fifth folder.
 
 For product planning, use the \`couch-potator-planner\` skill. To re-discuss a
 blocked card, run \`/unblock\`; the \`couch-potator-unblock\` skill explains the
@@ -188,7 +195,7 @@ Prefer the CLI over hand-editing frontmatter:
 | --- | --- |
 | Read the board | \`${command} list --json\` |
 | Read one spec | \`${command} show <card>\` |
-| Create a card | \`${command} add "Title" -k feature -m 1 -s board-screen\` |
+| Create a card | \`${command} add "Title" -k feature -m 1 -s board-screen -e browser\` |
 | Replace a spec body | \`${command} body <card> --file <path>\` |
 | Change status | \`${command} move <card> done\` |
 | Set a field | \`${command} set <card> surfaces "board-screen,card-panel"\` |
@@ -433,6 +440,25 @@ cards share a surface, the implementer must not build them at the same time.
 Write \`surfaces\` for anything the owner can point at. Omit it when the card changes
 nothing visible. Keep the names short and consistent with the glossary.
 
+### Environments
+
+An **environment** is a runtime that has to exist before a card can be checked: a
+browser, a desktop window, an iOS simulator, an Android emulator, a staging
+service. The project declares them in \`.couch-potator/config.json\` with a
+concurrency, and a card may name the ones it needs:
+
+\`\`\`yaml
+surfaces: [board-screen]
+environments: [browser]
+\`\`\`
+
+A visible card with no \`environments\` uses the project's
+\`default_environment\`, then the only declared environment, then one implicit
+\`app\` slot. Name one only when the project declares more than one and the card
+needs a specific one. Do not name a runtime when the ordinary checks — unit
+tests, lint, typecheck — can settle the criteria, and never invent a name the
+project does not declare.
+
 ## The card contract
 
 ### Frontmatter
@@ -448,6 +474,7 @@ order: 10
 depends_on: [add-lists, add-cards]
 related: [card-ordering]
 surfaces: [board-screen]
+environments: [browser]
 blocked_reason:
 completed:
 resolution:
@@ -467,6 +494,7 @@ updated: 2026-11-17
 | \`depends_on\` | yes | \`[]\` or card ids | Same project only. |
 | \`related\` | no | \`[]\` or card ids | Non-blocking links. |
 | \`surfaces\` | no | \`[]\` or short names | What the owner can point at. |
+| \`environments\` | no | \`[]\` or declared names | Runtimes needed to check it. |
 | \`blocked_reason\` | only when blocked | text | Why it cannot proceed. |
 | \`completed\` | only when done | \`YYYY-MM-DD\` | Set by the implementer. |
 | \`resolution\` | only when done | built, descoped, merged, split, superseded | Set by the implementer. |
@@ -525,6 +553,8 @@ Name the person in product terms ("a board member", "a visitor", "the owner"), n
 - Include empty, loading, error, permission and mobile states where relevant, or say
   they are out of scope.
 - 3–7 criteria. More usually means the card should be split.
+- Each criterion should be checkable by a command, a screenshot, or the owner. Say
+  which when it is not obvious; "it looks nice" is an owner check, not a build check.
 
 ### Granularity
 
@@ -633,6 +663,8 @@ Body sections:
 - **Non-goals** — what this version will not do.
 - **Constraints** — devices, budget, privacy, timeline, hosting, integrations.
 - **Stack decisions** — a table of area, decision, reason, date.
+- **Run and verify** — how to run each environment a check needs, how an instance
+  is isolated, and what evidence settles a criterion.
 - **Design direction** — references, anti-references, tone, brand.
 - **Glossary** — the product's words, defined once.
 - **Milestones** — what each milestone means, including what it excludes.
@@ -897,6 +929,8 @@ Before a card goes to \`todo\`:
 - [ ] No open questions.
 - [ ] Dependencies exist in this project and are acyclic.
 - [ ] Surfaces are named if the change is visible.
+- [ ] Environments are named when the project declares more than one and this card
+      needs a specific runtime; otherwise the default is enough.
 - [ ] No implementation details.
 - [ ] It belongs to the current milestone and fits one work session.
 
@@ -1121,6 +1155,8 @@ Check the planner's Definition of Ready:
 - [ ] No open questions.
 - [ ] Dependencies exist in this project and are acyclic.
 - [ ] Surfaces are named if the change is visible.
+- [ ] Environments are named when the project declares more than one and this card
+      needs a specific runtime; otherwise the default is enough.
 - [ ] No implementation details.
 - [ ] It belongs to the current milestone and fits one work session.
 
@@ -1220,9 +1256,15 @@ owns only the code inside its worktree.
 
 - The board is the source of truth. If it is unclear, stop and report.
 - Do not invent product behaviour. A question is a better answer than a guess.
-- **The WIP limit is the number of parallel slots in this run, and it is a ceiling, not a
-  target.** Start at most \`slots\` new cards, and always finish the cards already in
-  \`${boardPath}/in-progress/\` first, even if that temporarily exceeds the limit.
+- **The work width is a ceiling, not a target.** Start at most \`slots\` new cards,
+  and always finish the cards already in \`${boardPath}/in-progress/\` first, even
+  if that temporarily exceeds the limit.
+- **Work and witness are separate.** Editing code is parallel; touching a runtime
+  is not. A card is built by a worker and later witnessed against a real instance,
+  and a pool of one instance never turns a wide run into a serial one.
+- **An environment slot is shared and exclusive.** Never let two workers use one
+  instance of the same environment at the same time, and never start an instance
+  whose environment has no free slot.
 - The base branch is always working. Work happens on \`spec/<card-id>\`, in its own
   worktree under \`.couch-potator/worktrees/\`.
 - Never commit on the base branch except the board-start commit and one squash-merge
@@ -1248,8 +1290,9 @@ The command arguments are optional flags. Strip surrounding quotes before readin
 
 - \`--dry-run\` — print the plan and change nothing.
 - \`--one\` — stop after one batch is integrated.
-- \`--parallel N\` — how many cards may run at once. Default \`1\`. If the owner asks for
-  more than \`3\`, use \`3\` and say why.
+- \`--parallel N\` — how many cards may be **built** at once. Default \`1\`. If the
+  owner asks for more than \`3\`, use \`3\` and say why. Environments limit
+  witnessing, not this width.
 
 A card id is not an argument. Use \`${command} next\` so dependencies, surfaces and the
 current milestone are respected. If the owner names a card, say which batch it falls in
@@ -1272,6 +1315,7 @@ Read \`${briefPath}\` in full. Stop and report if:
 - \`current_milestone\` is missing;
 - Vision, Audience, Non-goals, Constraints, Stack decisions, Design direction,
   Glossary, or the current milestone section is missing;
+- \`## Run and verify\` is missing while a card in the batch has \`surfaces\`;
 - \`## Open project questions\` contains a question that affects the cards in this run;
 - \`${command} check\` exits non-zero.
 
@@ -1288,8 +1332,9 @@ git -C <project-root> rev-parse --show-toplevel
 If it fails, **initialize the repository automatically**:
 
 1. \`git init -b main\`.
-2. Make sure \`.gitignore\` contains \`.couch-potator/viewer/\` and
-   \`.couch-potator/worktrees/\`; append the missing lines.
+2. Make sure \`.gitignore\` contains \`.couch-potator/viewer/\`,
+   \`.couch-potator/worktrees/\` and \`.couch-potator/evidence/\`; append the missing
+   lines.
 3. \`git add -A\`.
 4. Inspect \`git diff --cached --name-only\`. If any staged path looks like a secret or
    build output — \`.env\`, \`.env.*\`, \`*.pem\`, \`*.key\`, \`id_rsa*\`, \`node_modules/\`,
@@ -1343,6 +1388,12 @@ run, then ask the owner to confirm the commands it reports, store them, and run 
 the branch before merging. If no check can be established and the card is not a
 foundation card, stop: you cannot verify it.
 
+The \`checks\` groups are commands that need no product runtime. A criterion that
+needs the product itself — a window, a page, a simulator, a service — is witnessed
+against an **environment**. The project declares those in
+\`.couch-potator/config.json\` and describes how to start, isolate and observe them
+in \`## Run and verify\` in the brief.
+
 ### 1d. Dry run
 
 If \`--dry-run\`, print the plan and stop. Do not initialize git, move a card, create a
@@ -1351,6 +1402,8 @@ worktree, spawn a worker or write a file. Include:
 - project, milestone and board counts;
 - base branch and worktree root;
 - whether the repository had to be initialized and which checks are configured;
+- the environment pools, which cards need a slot, and whether a single-slot queue
+  will be collapsed into one preview build;
 - the batch, the width ceiling and why each other eligible card was held back;
 - waiting and blocked cards;
 - warnings and errors;
@@ -1372,6 +1425,8 @@ The result contains:
 - \`waiting\` — cards whose dependencies are unfinished;
 - \`blocked\` — cards waiting on an owner decision;
 - \`slots\` — how many new cards may start (\`0\` means resume only);
+- \`environments\` — each runtime the run may need, its \`concurrency\`, and how many
+  instances cards in progress already hold;
 - \`errors\` and \`warnings\`.
 
 If \`errors\` is not empty, print every error and stop. The planner must fix the board;
@@ -1380,6 +1435,10 @@ do not guess. Mention \`warnings\` once, then continue.
 **The width is a ceiling, not a target.** A batch of one at width three is valid. Never
 wait for a batch to fill, never start a held-back card, and never lower the surface
 filter to use a free slot.
+
+**Witnessing does not lower the width.** If three cards need the one \`app\` instance
+the project allows, start all three and queue their checks. A narrow environment is a
+reason to pipeline, not a reason to build one card at a time.
 
 If the batch is empty:
 
@@ -1470,28 +1529,66 @@ The worker brief must contain:
   Glossary and current milestone sections of \`${briefPath}\`;
 - the list of done cards for this milestone;
 - the fast-check commands;
-- the visual-check rule below;
+- the environment slots it may use, with the instance values from the project's run
+  recipe, or exactly \`Do not start any environment.\`;
+- the witness rule in §3d;
 - \`Return the STATUS block from your instructions exactly. Do not edit the board,
   ${context.instructionsFile}, README.md or ${briefPath}.\`
 
-### 3d. Running the app and visual checks
+### 3d. Work and witness
 
-This section applies when the product has a surface a person can look at or interact
-with — a window, a page, a screen, a terminal UI. If it has none (a service, a library,
-a scheduled job), say so in the brief and apply the same rule to whatever manual check
-does apply.
+A card is finished when its criteria have been **witnessed**: turned into evidence.
+Witnessing is the part that touches the product's runtime, so it is the part that
+competes for a shared resource. Keep work and witness apart.
 
-- **One worker in the run:** the worker may run the app to check visual or interactive
-  criteria, and must describe exactly what it saw.
-- **More than one worker:** workers must **not** launch the app. Two instances fight
-  over whatever the runtime shares — a port, a local database or data folder, an
-  emulator, a device, a single-instance lock. The worker marks those criteria as
-  \`not verified by me — orchestrator to check\`. After the batch's workers have all
-  returned, you run the app once in the worktree and verify the criteria before merging.
+**Read the pools.** \`${command} next --json\` returns an \`environments\` map: each
+name, \`concurrency\` (how many isolated instances the project allows), \`in_use\` and
+\`free\`. A card's \`environments\` array names the pools it needs. A card with none
+needs no runtime: its checks are commands. If the project declares nothing and a
+visible card needs a runtime, treat it as a single \`app\` instance of one.
 
-Never let a worker claim visual evidence it could not have gathered. If neither you nor
-the worker can check a criterion, ask the owner through the \`${context.questionTool}\` tool before
-merging.
+**What a worker may do.** A worker always runs the fast checks; they are code
+checks. A worker may start the product only when you give it a slot: name the
+environment and give it the isolation values from \`## Run and verify\` — its port,
+bundle identifier, data folder, simulator or emulator. Never assign more workers to
+one environment than its \`free\` count. When the pool is one and more than one
+worker needs it, assign no slots; those workers mark runtime criteria
+\`pending witness\` and return.
+
+**Witness as branches become ready, not after the batch.** A returned worker is a
+branch you can check. Start its witness pass as soon as a slot is free, while the
+rest of the batch is still working. Never idle an environment while a finished card
+waits, and never integrate a card whose runtime criteria are still pending.
+
+**Three kinds of evidence, cheapest first.**
+
+- **Automated** — a command that fails loudly, a unit or integration test, a
+  browser or API test against an isolated instance. Cheapest, and the only kind that
+  is genuinely parallel.
+- **Vision** — a screenshot or short recording that you or a worker look at. Say
+  where the file is and what makes it pass.
+- **Human** — the owner has to look. Say why, and ask through the
+  \`${context.questionTool}\` tool.
+
+Never claim evidence you did not produce. A criterion you cannot check is a question
+for the owner or a blocked card, never a silent pass.
+
+**Collapse a single-slot queue into one build.** When a pool has one instance and
+two or more cards in the batch need it, do not build and launch once per card:
+
+\`\`\`sh
+git -C <repo> worktree add .couch-potator/worktrees/preview-<batch> -b preview/<batch> <base>
+git -C .couch-potator/worktrees/preview-<batch> merge --no-ff spec/<card-id>
+\`\`\`
+
+Merge each ready branch into the preview, one at a time. Build once, start one
+instance, walk every card's criteria, and record the evidence per card. A branch
+whose preview merge conflicts is left out and witnessed alone after it lands.
+Remove the preview worktree and delete \`preview/<batch>\` when the pass ends. Never
+merge the preview branch into the base; cards still land one at a time.
+
+Runtime artefacts stay out of the repository. Put screenshots and logs under
+\`.couch-potator/evidence/<card-id>/\` and never commit them.
 
 ## 4. Collect and integrate
 
@@ -1499,10 +1596,12 @@ Integrate **one card at a time**. The base branch must never hold two half-merge
 
 Start integrating a card as soon as its worker returns; do not wait for the rest of the
 batch. The cards in a batch are independent by construction, so the order they land in
-changes only which rebase each one needs.
+changes only which rebase each one needs. Start the witness pass as soon as the worker
+returns, while the rest of the batch is still working.
 
 Never integrate a branch whose worker is still running, and never start a second worker
-for the same card.
+for the same card. If you are the only process that can witness, witness between
+dispatches rather than after the whole batch.
 
 ### 4a. Read the result
 
@@ -1553,8 +1652,14 @@ If the result is \`STATUS: BLOCKED\`, go to §4e.
    If it fails again, go to §4e with \`blocked_reason: constraint\`.
 
 4. Check every acceptance criterion against the worker's evidence. A criterion the
-   worker could not check is checked by you, or the card is blocked with the exact
-   criterion. Do not merge a card with an unverified acceptance criterion.
+   worker could not check is checked by you against the environment it needs, or the
+   card is blocked with the exact criterion. Do not merge a card with a criterion that
+   is still \`pending witness\`.
+
+   Witness the pending criteria now if a slot is free; otherwise leave the branch
+   ready and pass it through the single-slot preview in §3d. When the evidence is a
+   screenshot, look at it and say what makes it pass. When it is automated, record the
+   command and its result.
 
 ### 4c. Rebase onto the current base
 
@@ -1650,6 +1755,7 @@ Never reset the base branch, and never use it for anything else.
    - Branch: \`spec/<card-id>\`
    - Base: \`<base>\` at \`<sha>\`
    - Checks: <each command and its result>
+   - Environments: <each runtime and the instance used, or "none">
    - Acceptance criteria: <one line per criterion, with the evidence>
 
    ## Outcome
@@ -1730,9 +1836,14 @@ Used for a worker \`STATUS: BLOCKED\`, a failed retry, or a product conflict.
 ## 5. Loop
 
 After each card lands, re-run \`${command} next --parallel <N> --json\`. If it offers a
-new batch and a slot is free, start it; do not idle waiting for the rest of the previous
-batch. Re-run rather than working from a stale list, so surfaces held by running cards
-are respected.
+new batch and a work slot is free, start it; do not idle waiting for the rest of the
+previous batch. Re-run rather than working from a stale list, so surfaces held by
+running cards are respected.
+
+Witnessing is the second queue. A wide batch with one \`app\` slot is normal: build
+them all, then witness them through the single slot or one preview pass. Only start a
+new card when a work slot is free; only start a witness when an environment slot is
+free.
 
 Stop when:
 
@@ -1752,14 +1863,16 @@ Keep the report under one screen where possible. Include:
 
 - project, milestone, the width ceiling, and the size of each round (for example
   \`width 3 · rounds: 3, 1, 2\`);
+- the environment pools, and which cards waited for a witness slot or shared one
+  preview build;
 - base branch and commit, plus the full-build result when the milestone finished;
 - done cards with their merge commits, and for each one whether the rebase was already
   clean, needed no help, or needed the integrator to adapt it;
 - blocked cards with the overlap statement and the questions raised;
 - held-back cards and the surfaces that collided;
 - waiting cards with their dependency chains;
-- items that need the owner's eyes, especially visual or usability checks;
-- how to run the app;
+- items that need the owner's eyes, especially vision or human evidence;
+- how to start each environment used in the run;
 - the next command.
 
 Do not pad the report. The owner should see what needs attention in under a minute.
@@ -1774,7 +1887,7 @@ Do not pad the report. The owner should see what needs attention in under a minu
 - Never mark a card done without verification.
 - Never move a blocked card to \`todo/\`; that is the planner's job after the owner
   answers.
-- Never add or change \`surfaces\`. That is a planning judgement.
+- Never add or change \`surfaces\` or \`environments\`. That is a planning judgement.
 - Leave later-milestone cards alone; mention them in the report.
 - If the board and the app disagree, the board wins. Report the disagreement; do not
   silently fix it.
@@ -1806,7 +1919,9 @@ At the start of every run:
 - Merge two branches at once, or merge onto a stale base.
 - Reuse a worker session across cards.
 - Skip verification because the worker said it was done.
-- Let a worker launch the app in a multi-card run.
+- Let two workers use one environment instance at the same time.
+- Let a worker start an environment you did not assign, or claim evidence it did not
+  produce.
 - Add \`--force\`, \`-f\`, or \`-D\` to a command that is not listed here.
 `;
 }
@@ -1864,9 +1979,14 @@ prompt. Read the files anyway; the worktree is the source.
 - Read the existing code before changing it. Match its conventions.
 - Run the fast checks in the order the orchestrator gives you, with the worktree as the
   working directory. If a check is not configured, skip it.
-- For visual or interactive criteria, follow the orchestrator's rule exactly. If it
-  says not to launch the app, do not launch it; mark those criteria
-  \`not verified by me — orchestrator to check\`.
+- Witness the card the way the orchestrator allows. Run the fast checks always. Start
+  the product only if the orchestrator assigned you an environment **and** gave you its
+  instance values; use exactly those, never another port, data folder or device. If it
+  did not, do not start anything: mark runtime criteria \`pending witness — orchestrator
+  to check\`.
+- Prefer automated evidence: a command, a test, a request, a file assertion. Then a
+  screenshot or recording, with the path and what makes it pass. Never claim a criterion
+  you did not check.
 - Record internal, reversible decisions in the commit message or in the \`NOTES\` line of
   your result. Do not create a second decision log.
 - Do **not** edit the board, the card, \`${briefPath}\`, \`${context.instructionsFile}\` or
@@ -1924,9 +2044,10 @@ SUMMARY: <one or two sentences>
 FILES CHANGED: <paths>
 CHECKS:
 - \`<command>\` — pass/fail — <summary>
+ENVIRONMENT: <name and instance values you used, or "none">
 ACCEPTANCE:
 - [x] <criterion> — <evidence>
-- [ ] <criterion> — <why it could not be verified>
+- [ ] <criterion> — pending witness: <what the orchestrator must run or look at>
 OWNER CHECK: <what the owner should look at, or "none">
 NOTES: <internal decisions and anything the orchestrator must know>
 \`\`\`

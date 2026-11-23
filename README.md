@@ -52,6 +52,7 @@ The dependency graph and a card's spec, as the viewer renders them, are in
 - [Milestones](#milestones)
 - [Ready cards and the implement queue](#ready-cards-and-the-implement-queue)
 - [Verification checks](#verification-checks)
+- [Environments](#environments)
 - [The viewer](#the-viewer)
 - [Dependency graph](#dependency-graph)
 - [Configuration](#configuration)
@@ -309,6 +310,7 @@ priority: must           # must | should | could
 order: 20                # position inside a column
 depends_on: [reading-list-page]
 related: [book-details]
+environments: [browser]    # runtime needed to check it
 surfaces: [add-form]      # what the owner can point at
 blocked_reason:
 completed:
@@ -458,20 +460,25 @@ How a run works:
 3. Each card moves to `in-progress/` and gets a branch `spec/<card-id>` and a
    worktree at `.couch-potator/worktrees/spec-<card-id>`.
 4. One worker per card implements **one** card, runs the fast checks and returns
-   a `STATUS: DONE` or `STATUS: BLOCKED` report.
-5. The orchestrator reviews the diff, runs the fast checks, checks every
-   acceptance criterion and rebases onto the current base. A conflicted rebase
-   goes to the `couch-potator-integrator` subagent, which may only make
-   *mechanical* adaptations; a product conflict blocks the card.
+   a `STATUS: DONE` or `STATUS: BLOCKED` report. A worker starts a runtime only
+   when the orchestrator assigned it an environment slot.
+5. The orchestrator reviews the diff, runs the fast checks, witnesses every
+   acceptance criterion and rebases onto the current base. Witnessing starts as
+   soon as a branch is ready, while the rest of the batch is still being built;
+   when several cards share a single-instance environment, their checks collapse
+   into one preview build and one launch. A conflicted rebase goes to the
+   `couch-potator-integrator` subagent, which may only make *mechanical*
+   adaptations; a product conflict blocks the card.
 6. The card is squash-merged as one commit, moved to `done/` with a
    `## Verification` section, and the worktree and branch are removed.
 7. Blocked cards go to `blocked/` with a `## Decision needed` section; the
    branch is kept so the work survives.
 
 It never pushes, never forces, never merges two branches at once, and never
-marks a card done without verification. Only a single-worker run may launch the
-app for visual checks; with more workers, the orchestrator does it after the
-batch returns.
+marks a card done without verification. `--parallel` bounds how many cards are
+**built** at once; `concurrency` in `config.json` bounds how many runtimes are
+**checked** at once. A single-instance product still builds cards in parallel and
+queues their checks; see [Environments](#environments).
 
 If the project root is not a git repository yet, the skill initializes one
 automatically — but it stops and asks if the staged files look like secrets or
@@ -491,8 +498,8 @@ Exit codes: `0` success, `1` invalid board or failed validation, `2` usage error
 | `couch-potator init [--name <n>] [--target opencode\|claude\|both] [--no-skill] [--force]` | Scaffold a board in the current folder. Idempotent; never overwrites `PROJECT.md`. `--target` picks the agent runtime (default `opencode`); `--no-skill` skips the agent files; `--force` rewrites them. |
 | `couch-potator list [-c <col>] [-m <n>] [-k <kind>] [--all] [--json] [--ids]` | List cards, sorted by status, then `order`, then title. |
 | `couch-potator show <card> [--raw\|--path\|--json]` | Print a spec, its file path or its JSON. `<card>` may be an id or a unique prefix. |
-| `couch-potator check [--strict] [--json]` | Validate ids, links, cycles, orders, columns and in-progress surface collisions. Exit 1 on errors; `--strict` also fails on warnings. |
-| `couch-potator next [--parallel <1-3>] [--json]` | Pick the next ready cards, in dependency/priority/order/kind order, and report the batch, held-back, waiting, blocked and in-progress cards. |
+| `couch-potator check [--strict] [--json]` | Validate ids, links, cycles, orders, columns, environments and in-progress surface collisions. Exit 1 on errors; `--strict` also fails on warnings. |
+| `couch-potator next [--parallel <1-3>] [--json]` | Pick the next ready cards, in dependency/priority/order/kind order, and report the batch, held-back, waiting, blocked and in-progress cards plus the environment pools. |
 | `couch-potator graph [--format text\|mermaid\|dot] [-m <n>]` | Print the dependency graph without a browser. |
 | `couch-potator view [--watch] [--no-open] [--milestone <n\|all>] [--out <path>]` | Generate and open the read-only viewer. |
 
@@ -500,10 +507,10 @@ Exit codes: `0` success, `1` invalid board or failed validation, `2` usage error
 
 | Command | Effect |
 | --- | --- |
-| `couch-potator add "<title>" [-c todo] [-k feature] [-m 1] [-p must] [-o 10] [-s <surface>]... [-d <card>]... [-r <card>]... [--body <file\|->] [--json]` | Create a card. `-c` accepts `wip`/`inprogress` for `in-progress`. Repeat `-d` and `-r`; `-s` may repeat or be comma-separated. |
+| `couch-potator add "<title>" [-c todo] [-k feature] [-m 1] [-p must] [-o 10] [-s <surface>]... [-e <environment>]... [-d <card>]... [-r <card>]... [--body <file\|->] [--json]` | Create a card. `-c` accepts `wip`/`inprogress` for `in-progress`. Repeat `-d` and `-r`; `-s` and `-e` may repeat or be comma-separated. |
 | `couch-potator body <card> --file <file\|->` | Replace a card body. Use `-` to read stdin. |
 | `couch-potator move <card> <column> [--top\|--bottom\|--before <card>\|--after <card>]` | Move a card and renumber both columns. |
-| `couch-potator set <card> <field> <value>` | Set `kind`, `milestone`, `priority`, `order`, `title`, `surfaces`, `blocked_reason`, `resolution` or `completed`. Use `-` to clear. |
+| `couch-potator set <card> <field> <value>` | Set `kind`, `milestone`, `priority`, `order`, `title`, `surfaces`, `environments`, `blocked_reason`, `resolution` or `completed`. Use `-` to clear. |
 | `couch-potator edit <card>` | Open the spec in `$VISUAL`/`$EDITOR`. |
 | `couch-potator rm <card> [--force]` | Delete a card. |
 
@@ -610,9 +617,9 @@ Waiting
 
 `--json` returns the same information for an agent: `batch`, `held_back` with a
 reason each, `waiting` with the unresolved dependencies, `blocked`, `done`,
-`in_progress`, `eligible`, `slots`, `errors` and `warnings`. The command exits
-`1` when the board has validation errors, so an implementer can stop before
-building.
+`in_progress`, `eligible`, `slots`, `environments`, `errors` and `warnings`. The
+command exits `1` when the board has validation errors, so an implementer can
+stop before building.
 
 `couch-potator check` validates the board. `couch-potator next` only reads it.
 
@@ -643,6 +650,71 @@ A stack that does not need a step simply leaves it out; an empty phase is not a
 failed check. `--json` prints `{ "fast": { ... }, "full": { ... } }` for an
 agent. The implement skill asks for the commands once, writes them here, and
 reuses them.
+
+## Environments
+
+A card with `surfaces` needs a runtime before anyone can say it works: a browser,
+a desktop window, a simulator, an emulator, a staging service. When two instances
+of that runtime would collide — a port, a data folder, a device, a single window,
+a single-instance lock — the runtime is an **environment**.
+
+Declare the ones this project has in `.couch-potator/config.json`:
+
+```json
+{
+  "environments": {
+    "browser": { "concurrency": 3, "hint": "npm run dev -- --port $SLOT_PORT" },
+    "ios-sim": { "concurrency": 2, "hint": "xcrun simctl clone iPhone-16 slot-$SLOT" },
+    "mac-app": { "concurrency": 1 }
+  },
+  "default_environment": "browser"
+}
+```
+
+`concurrency` is how many isolated instances may exist at the same time. `hint`
+is how instance *n* differs from instance *n-1*: its port, bundle identifier,
+data folder, simulator or emulator name. Agents read it before launching
+anything. `default_environment` is used when a card does not name one; with a
+single environment it can be omitted.
+
+A card names the environments it needs:
+
+```yaml
+surfaces: [board-screen]
+environments: [browser]
+```
+
+or, from the CLI, `couch-potator add "..." -e browser` and
+`couch-potator set <card> environments "browser, staging-api"`. A card without
+`surfaces` needs no environment, because unit tests and linters do not start a
+server or a window. A visible card with no explicit environment uses
+`default_environment`, then the only declared environment, then one implicit
+`app` slot — so an older project keeps working and stays safe.
+
+The width and the pool are different things:
+
+- `--parallel N` is **work width**: how many cards may be edited at once.
+  Surfaces still keep two cards on the same screen apart.
+- `concurrency` is **witness width**: how many instances may be built and
+  checked at once.
+
+A project with one `mac-app` slot is not forced back to one card at a time. Three
+cards can be built in parallel and their visual checks queue behind the single
+instance; the implementer collapses a queue into one build and one launch when
+it can (see [Implementing with an agent](#implementing-with-an-agent)). A web
+project with `browser: 3` can check three cards at once.
+
+`couch-potator next` reports both, and counts the instances already held by
+cards in `in-progress/`:
+
+```text
+Parallel: 3 slot(s), 3 free
+Environments: browser — 0/3 in use · mac-app — 1/1 in use
+```
+
+An environment a card names but the project does not declare is a warning and
+runs alone. `couch-potator check` also warns when several environments are
+declared without a `default_environment`.
 
 ## The viewer
 
@@ -722,13 +794,19 @@ couch-potator graph --format dot           # pipe into Graphviz
     "full": {
       "build": "npm run build"
     }
-  }
+  },
+  "environments": {
+    "browser": { "concurrency": 3 }
+  },
+  "default_environment": "browser"
 }
 ```
 
 `board` and `brief` are relative to the project root. Missing keys fall back to
 the defaults above, so an older config keeps working. `checks` is managed by
-`couch-potator checks`; edit it by hand only if you must.
+`couch-potator checks`; edit it by hand only if you must. `environments` and
+`default_environment` describe the runtimes a card may need; see
+[Environments](#environments).
 
 `--root <path>` points any command at a different project. Otherwise the CLI
 walks up from the current folder to the nearest board.

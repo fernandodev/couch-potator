@@ -63,5 +63,8 @@ export async function showCommand(argv: string[]): Promise<number> {
   if (card.surfaces.length) {
     console.log(`${dim("surfaces")}   ${card.surfaces.join(", ")}`);
   }
+  if (card.environments.length) {
+    console.log(`${dim("environments")} ${card.environments.join(", ")}`);
+  }
   return 0;
 }

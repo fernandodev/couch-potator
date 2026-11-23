@@ -45,6 +45,7 @@ describe("completionCandidates", () => {
     assert.ok(flags.includes("--column"));
     assert.ok(flags.includes("--kind"));
     assert.ok(flags.includes("--surface"));
+    assert.ok(flags.includes("--environment"));
     assert.ok(flags.includes("--root"));
     assert.ok(!flags.includes("--force"));
   });

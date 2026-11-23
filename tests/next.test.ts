@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
@@ -7,6 +7,7 @@ import { addCommand } from "../src/commands/add.js";
 import { initCommand } from "../src/commands/init.js";
 import { moveCommand } from "../src/commands/move.js";
 import { analyseNext, nextCommand } from "../src/commands/next.js";
+import { configPath } from "../src/config.js";
 import { captureOutput, type OutputCapture } from "./support.js";
 
 let root: string;
@@ -25,6 +26,17 @@ afterEach(() => {
 
 async function add(title: string, args: string[] = []): Promise<void> {
   await addCommand(["--root", root, title, "-m", "1", ...args]);
+}
+
+function writeConfig(
+  environments: Record<string, { concurrency?: number; hint?: string }>,
+  defaultEnvironment?: string,
+): void {
+  const config = JSON.parse(readFileSync(configPath(root), "utf8")) as Record<string, unknown>;
+  config.environments = environments;
+  if (defaultEnvironment) config.default_environment = defaultEnvironment;
+  else delete config.default_environment;
+  writeFileSync(configPath(root), `${JSON.stringify(config, null, 2)}\n`, "utf8");
 }
 
 describe("next ordering", () => {
@@ -116,6 +128,60 @@ describe("next batches", () => {
   });
 });
 
+describe("next environments", () => {
+  it("reports a pool without narrowing the work batch", async () => {
+    writeConfig({ app: { concurrency: 1 } }, "app");
+    await add("Board one", ["-s", "board-screen"]);
+    await add("Board two", ["-s", "card-panel"]);
+
+    const result = analyseNext(root, 2);
+    assert.deepEqual(result.batch.map((spec) => spec.id), ["board-one", "board-two"]);
+    assert.deepEqual(result.batch[0]?.environments, ["app"]);
+    assert.equal(result.environments.app?.concurrency, 1);
+    assert.equal(result.environments.app?.in_use, 0);
+    assert.equal(result.environments.app?.free, 1);
+  });
+
+  it("counts in-progress cards against the pool", async () => {
+    writeConfig({ app: { concurrency: 1 } }, "app");
+    await add("Running", ["-c", "in-progress", "-s", "board-screen"]);
+    await add("Ready", ["-s", "card-panel"]);
+
+    const result = analyseNext(root, 2);
+    assert.equal(result.environments.app?.in_use, 1);
+    assert.equal(result.environments.app?.free, 0);
+    assert.deepEqual(result.batch.map((spec) => spec.id), ["ready"]);
+  });
+
+  it("falls back from the default to the only declared environment, then to app", async () => {
+    await add("Visible", ["-s", "board-screen"]);
+    assert.deepEqual(analyseNext(root, 1).batch[0]?.environments, ["app"]);
+
+    writeConfig({ browser: { concurrency: 3 } });
+    assert.deepEqual(analyseNext(root, 1).batch[0]?.environments, ["browser"]);
+
+    writeConfig({ browser: { concurrency: 3 }, ios: { concurrency: 2 } }, "browser");
+    assert.deepEqual(analyseNext(root, 1).batch[0]?.environments, ["browser"]);
+  });
+
+  it("leaves the environment unset when several are declared without a default", async () => {
+    writeConfig({ browser: { concurrency: 3 }, ios: { concurrency: 2 } });
+    await add("Ambiguous", ["-s", "board-screen"]);
+
+    const result = analyseNext(root, 1);
+    assert.deepEqual(result.batch[0]?.environments, []);
+    assert.match(result.warnings.join("\n"), /no environment|default_environment/);
+  });
+
+  it("never gives a card without surfaces an environment", async () => {
+    writeConfig({ browser: { concurrency: 3 } }, "browser");
+    await add("Backend work");
+
+    const result = analyseNext(root, 1);
+    assert.deepEqual(result.batch[0]?.environments, []);
+  });
+});
+
 describe("next errors and output", () => {
   it("reports a missing current milestone", async () => {
     writeFileSync(
@@ -153,6 +219,18 @@ describe("next errors and output", () => {
   it("rejects a parallel width below 1", async () => {
     await assert.rejects(() => nextCommand(["--root", root, "--parallel", "0"]), /at least 1/);
     await assert.rejects(() => nextCommand(["--root", root, "--parallel", "two"]), /at least 1/);
+  });
+
+  it("prints the environment pools beside the batch", async () => {
+    writeConfig({ browser: { concurrency: 3 }, app: { concurrency: 1 } }, "browser");
+    await add("Visible", ["-s", "board-screen"]);
+    output.clear();
+
+    const code = await nextCommand(["--root", root, "--parallel", "1"]);
+    assert.equal(code, 0);
+    const text = output.logs.join("\n");
+    assert.match(text, /Environments: browser — 0\/3 in use · app — free/);
+    assert.match(text, /env: browser/);
   });
 
   it("prints a human plan with batch, held back and waiting sections", async () => {

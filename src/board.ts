@@ -5,7 +5,7 @@ import {
   type Column,
 } from "./columns.js";
 import { readCard, type Card } from "./card.js";
-import { boardDir, briefPath, loadConfig, relativeToRoot, type Config } from "./config.js";
+import { boardDir, briefPath, configIssues, loadConfig, relativeToRoot, type Config } from "./config.js";
 import { CliError, UsageError } from "./errors.js";
 import { parseMarkdown, type Frontmatter } from "./frontmatter.js";
 import { slugify } from "./slug.js";
@@ -85,7 +85,7 @@ function readBrief(root: string, config: Config): Brief {
 export function scanBoard(root: string, options: ScanOptions = {}): Board {
   const config = loadConfig(root);
   const dir = boardDir(root, config);
-  const issues: Issue[] = [];
+  const issues: Issue[] = [...configIssues(config)];
   const cards: Card[] = [];
 
   if (!existsSync(dir)) {

@@ -117,6 +117,8 @@ const FLAGS: Record<string, Record<string, FlagSpec>> = {
     "--related": { takesValue: true, source: "card" },
     "-s": { takesValue: true },
     "--surface": { takesValue: true },
+    "-e": { takesValue: true },
+    "--environment": { takesValue: true },
     "-b": { takesValue: true },
     "--body": { takesValue: true },
     "--json": { takesValue: false },

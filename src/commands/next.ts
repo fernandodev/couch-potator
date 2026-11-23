@@ -3,7 +3,13 @@ import { flag, parseCommandArgs, text, ROOT_OPTION } from "../args.js";
 import { projectSlug, scanBoard } from "../board.js";
 import type { Card } from "../card.js";
 import { COLUMN_LABEL, type Column } from "../columns.js";
-import { relativeToRoot, resolveRoot } from "../config.js";
+import { relativeToRoot, resolveRoot, type Config } from "../config.js";
+import {
+  environmentLine,
+  environmentUsage,
+  environmentsForCard,
+  type EnvironmentUsage,
+} from "../environments.js";
 import { UsageError } from "../errors.js";
 import { plural } from "../log.js";
 import { countIssues } from "../types.js";
@@ -38,6 +44,7 @@ export interface SpecSummary {
   order: number | null;
   depends_on: string[];
   surfaces: string[];
+  environments: string[];
   file: string;
 }
 
@@ -65,6 +72,8 @@ export interface NextBatch {
   };
   parallel: number;
   slots: number;
+  /** Environment pools and how many instances are already held. */
+  environments: Record<string, EnvironmentUsage>;
   next: SpecSummary | null;
   batch: SpecSummary[];
   held_back: HeldBackSpec[];
@@ -100,7 +109,7 @@ function compareCards(left: Card, right: Card): number {
   return left.id.localeCompare(right.id);
 }
 
-function summary(card: Card): SpecSummary {
+function summary(card: Card, config: Config): SpecSummary {
   return {
     id: card.id,
     title: card.title,
@@ -111,6 +120,7 @@ function summary(card: Card): SpecSummary {
     order: card.order,
     depends_on: card.dependsOn,
     surfaces: card.surfaces,
+    environments: environmentsForCard(card, config),
     file: card.relFile,
   };
 }
@@ -137,6 +147,7 @@ function chooseBatch(
   eligible: Card[],
   slots: number,
   inProgress: Card[],
+  config: Config,
 ): { batch: Card[]; heldBack: HeldBackSpec[] } {
   const batch: Card[] = [];
   const heldBack: HeldBackSpec[] = [];
@@ -145,15 +156,15 @@ function chooseBatch(
   for (const card of eligible) {
     const conflict = surfaceConflict(card, taken);
     if (conflict) {
-      heldBack.push({ ...summary(card), reason: conflict });
+      heldBack.push({ ...summary(card, config), reason: conflict });
       continue;
     }
     if (slots <= 0) {
-      heldBack.push({ ...summary(card), reason: "no free slot in this run" });
+      heldBack.push({ ...summary(card, config), reason: "no free slot in this run" });
       continue;
     }
     if (batch.length >= slots) {
-      heldBack.push({ ...summary(card), reason: "beyond the parallel limit" });
+      heldBack.push({ ...summary(card, config), reason: "beyond the parallel limit" });
       continue;
     }
     batch.push(card);
@@ -230,7 +241,7 @@ export function analyseNext(root: string, parallel: number): NextBatch {
       const unresolved = card.dependsOn.filter((dependency) => !doneIds.has(dependency));
       if (unresolved.length) {
         waiting.push({
-          ...summary(card),
+          ...summary(card, board.config),
           unresolved_deps: unresolved.map((dependency) => {
             const dependencyCard = board.byId.get(dependency);
             return {
@@ -256,7 +267,8 @@ export function analyseNext(root: string, parallel: number): NextBatch {
   }
 
   const slots = Math.max(0, parallel - inProgress.length);
-  const { batch, heldBack } = chooseBatch(eligible, slots, inProgress);
+  const { batch, heldBack } = chooseBatch(eligible, slots, inProgress, board.config);
+  const environments = environmentUsage(board.config, inProgress);
 
   if (board.brief.exists) {
     const status = board.brief.data.status;
@@ -287,18 +299,19 @@ export function analyseNext(root: string, parallel: number): NextBatch {
     },
     parallel,
     slots,
-    next: eligible[0] ? summary(eligible[0]) : null,
-    batch: batch.map(summary),
+    environments,
+    next: eligible[0] ? summary(eligible[0], board.config) : null,
+    batch: batch.map((card) => summary(card, board.config)),
     held_back: heldBack,
-    eligible: eligible.map(summary),
+    eligible: eligible.map((card) => summary(card, board.config)),
     waiting,
     blocked: board.cards
       .filter((card) => card.status === "blocked" && card.milestone === current)
-      .map((card) => ({ ...summary(card), blocked_reason: card.blockedReason })),
-    in_progress: inProgress.map(summary),
+      .map((card) => ({ ...summary(card, board.config), blocked_reason: card.blockedReason })),
+    in_progress: inProgress.map((card) => summary(card, board.config)),
     done: board.cards
       .filter((card) => card.status === "done" && card.milestone === current)
-      .map(summary),
+      .map((card) => summary(card, board.config)),
     out_of_milestone: board.cards.filter((card) => card.milestone !== current).length,
     errors,
     warnings,
@@ -307,7 +320,10 @@ export function analyseNext(root: string, parallel: number): NextBatch {
 
 function specLine(spec: SpecSummary): string {
   const surfaces = spec.surfaces.length ? ` [${spec.surfaces.join(", ")}]` : "";
-  return `- ${bold(spec.id)} — ${spec.title} (${spec.priority})${surfaces}`;
+  const environments = spec.environments.length
+    ? ` ${dim(`env: ${spec.environments.join(", ")}`)}`
+    : "";
+  return `- ${bold(spec.id)} — ${spec.title} (${spec.priority})${surfaces}${environments}`;
 }
 
 function section(title: string, lines: string[]): void {
@@ -350,6 +366,15 @@ export async function nextCommand(argv: string[]): Promise<number> {
     `Milestone: ${result.milestone.counts.done} done · ${result.milestone.counts["in-progress"]} in progress · ${result.milestone.counts.blocked} blocked · ${result.milestone.counts.todo} todo`,
   );
   console.log(`Parallel: ${result.parallel} slot(s), ${result.slots} free`);
+
+  const pools = Object.entries(result.environments);
+  if (pools.length) {
+    console.log(
+      `Environments: ${pools
+        .map(([name, usage]) => environmentLine(name, usage))
+        .join(" · ")} ${dim("(witness width, not work width)")}`,
+    );
+  }
 
   if (result.next) {
     console.log(`Next: ${bold(result.next.id)} — ${result.next.title} (${result.next.priority})`);

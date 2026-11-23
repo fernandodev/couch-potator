@@ -33,6 +33,7 @@ export async function initCommand(argv: string[]): Promise<number> {
 
   const created: string[] = [];
   const existing: string[] = [];
+  const updated: string[] = [];
   const removed: string[] = [];
 
   const config = existsSync(configPath(root)) ? loadConfig(root) : DEFAULT_CONFIG;
@@ -83,11 +84,13 @@ export async function initCommand(argv: string[]): Promise<number> {
     });
     created.push(...result.written);
     existing.push(...result.skipped);
+    updated.push(...result.updated);
     removed.push(...result.removed);
   }
 
   console.log(`${green("Initialised")} board in ${cyan(root)}`);
   for (const item of created) console.log(`  ${green("+")} ${item}`);
+  for (const item of updated) console.log(`  ${green("~")} ${item}`);
   for (const item of existing) console.log(`  ${dim("=")} ${dim(item)}`);
   for (const item of removed) console.log(`  ${yellow("-")} ${item}`);
   console.log("");

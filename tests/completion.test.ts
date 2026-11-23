@@ -61,6 +61,11 @@ describe("completionCandidates", () => {
 
     const skillFlags = completionCandidates({ current: "--", previous: ["skill"] });
     assert.ok(skillFlags.includes("--target"));
+    assert.ok(skillFlags.includes("--update"));
+    assert.deepEqual(completionCandidates({ current: "", previous: ["skill"] }), [
+      "install",
+      "update",
+    ]);
     assert.deepEqual(completionCandidates({ current: "cl", previous: ["skill", "--target"] }), [
       "claude",
     ]);
